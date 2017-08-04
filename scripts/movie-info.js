@@ -89,8 +89,7 @@ var MOVIE_INFO = {
       {title: 'Genres', content: 'Animation, Adventure, Comedy'},
       {title: 'Length', content: ' 1h 27min'},
       {title: 'Writers', content: ' Cinco Paul, Ken Daurio & Brian Lynch'},
-      {title: 'Stars', content: 'Louis C.K., Eric Stonestreet, Kevin Hart '},
-      {title: 'Awards', content: 'Oscar:  Best Animated Feature Film of the Year'}
+      {title: 'Stars', content: 'Louis C.K., Eric Stonestreet, Kevin Hart '}
 
     ]
   }
