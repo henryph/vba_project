@@ -1,0 +1,138 @@
+Sub get_result()
+    
+    Application.AskToUpdateLinks = False
+    
+    Dim folder As String
+    Dim hotel As String
+    Dim middle_col As Range
+    Dim middle As Integer
+    Dim budget, budget_p, actual, actual_p, ly, ly_p, i As Integer
+    Dim fxrate As Double
+    
+    Dim hotels() As String 'Array to store hotel code
+    Dim hotels_rows() As Integer 'Array to store the row of the hotel in summary sheet
+    
+    Dim hotelWB As Workbook
+    Dim WS, WS_summary, WS_hotel_list As Worksheet
+    Dim WS1, WS2 As Worksheet
+    
+    
+    'Use path of the current workbook as the path
+    folder = ActiveWorkbook.Path
+    
+    'set the worksheet
+    Set WS_summary = ThisWorkbook.Sheets("Rooms Summary - YTD ")
+    Set WS_cost = ThisWorkbook.Sheets("Rooms Costs POR - YTD")
+    Set WS_hotel_list = ThisWorkbook.Sheets("hotel_list")
+    
+    'Get number of hotels based on the list
+    Dim NumberOfHotels As Integer
+    NumberOfHotels = WS_hotel_list.Cells(Rows.Count, 1).End(xlUp).Row - 1
+    
+    MsgBox "Total Number of Hotels: " & NumberOfHotels
+    
+    ReDim hotels(1 To NumberOfHotels)
+    ReDim hotels_rows(1 To NumberOfHotels)
+    
+    For i = 1 To NumberOfHotels
+        hotels(i) = WS_hotel_list.Cells(i + 1, 1).Value
+        hotels_rows(i) = WS_summary.Range("B:B").Find(hotels(i)).Row
+        Next
+    
+    Dim file As Variant
+    
+    For counter = 1 To NumberOfHotels
+        file = Dir(folder & "\*" & hotels(counter) & "*")
+        If file <> "" Then
+            WS_hotel_list.Cells(counter + 1, 4).Value = file
+        End If
+                
+        Next
+    
+    For counter = 1 To NumberOfHotels
+    
+        file = folder & "\" & WS_hotel_list.Cells(counter + 1, 4).Value 'filepath
+        hotel = hotels(counter) 'hotel code
+        i = hotels_rows(counter) 'row of hotel in the summary sheet
+        
+        'find fx rate in the hotel list worksheet, need to change G and H if position is changed
+        fxrate = WS_hotel_list.Cells(WS_hotel_list.Range("G:G").Find(WS_hotel_list.Cells((counter + 1), "C")).Row, "H")
+            
+        If Dir(file) <> "" Then
+            Set hotelWB = Workbooks.Open(file, ReadOnly:=True)
+            
+            Set WS1 = WB.Sheets("PL02 RoomsDept")
+            Set WS2 = WB.Sheets("PL02c Rooms POR")
+            
+            'Find the middle column
+            Set findMiddleCol = WS1.Range("A1", "Z10").Find("Rooms Department", LookAt:=xlPart)
+            
+            'Find the column for Budget
+            Set findBudget = WS1.Range(WS1.Cells(1, findCentralCol.Column), "Z10").Find("BUDGET", LookAt:=xlPart)
+            
+            'Find the column for Last year
+            Set findLY = WS1.Range(WS1.Cells(1, findCentralCol.Column), "Z10").Find("Printed", LookAt:=xlPart)
+            
+            If Not findLY Is Nothing And Not findBudget Is Nothing Then
+                
+                'middle, budget, budget_p ... all are the index(number) of the column
+                'middle_col is the column
+                
+                middle = findCentralCol.Column
+                Set middle_col = WS.Columns(middle)
+                
+                budget = findBudget.Column
+                budget_p = budget + 1
+                actual = budget + 2
+                actual_p = budget + 3
+                ly = findLY.Column - 1
+                ly_p = findLY.Column
+                  
+            End If
+            
+            '******* Now Do the Worksheet 1 - Rooms Dept *******
+            
+            If Not findLY Is Nothing And Not findBudget Is Nothing Then
+                                   
+                MsgBox hotel & " " & WS1.Cells(4, middle).Value
+                
+                'r = findrow("DEPT PROFIT", middle_col, hotel)
+                    
+                'WS_summary.Cells(i, "H").Value = WS1.Cells(r, actual_p).Value
+                'WS_summary.Cells(i, "I").Value = WS1.Cells(r, budget_p).Value
+                'WS_summary.Cells(i, "J").Value = WS1.Cells(r, ly_p).Value
+                
+            Else
+                MsgBox "Can't find the column contains *spa* or *ytd* at " & hotels(counter)
+            End If
+            
+            
+            '******* Now Do the Worksheet 2 - Rooms Dept (POR) *******
+            
+                
+                    
+            
+            ' Close workbook without save
+            hotelWB.Close SaveChanges:=False
+        Else
+            MsgBox "Hotel " & hotels(counter) & " not exist"
+        End If
+        
+    Next
+    
+    Application.AskToUpdateLinks = True
+End Sub
+
+
+
+Function findrow(searchText As String, rng As Range, hotel As String)
+    Set findR = rng.Find(searchText, LookAt:=xlPart)
+    If Not findR Is Nothing Then
+        findrow = findR.Row
+    Else
+       MsgBox "Cannot find the text *" & searchText & "* at " & hotel
+       findrow = 9999 'If can't find the text, let it be a large number so that will be no content
+    End If
+End Function
+
+
