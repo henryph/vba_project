@@ -1,0 +1,74 @@
+https://i.cs.hku.hk/~msd17092/
+
+Account Name: msd17092
+Password: YCNzfgKk
+
+login cs vpn:
+vpn.cs.hku.hk
+sftp msd17092@i.cs.hku.hk
+
+cs intranet
+
+
+Username: 	hpan2
+Password: 	rDCJEmdM
+Door access code: 	9799
+
+
+Username: 	hpan2
+Password: 	rDCJEmdM
+
+
+easy-to-learn example: https://i.cs.hku.hk/~msd17081/
+https://i.cs.hku.hk/~msd17082/
+
+Each student has to design a dissertation webpage and place it into a dissertation account allocated by the Technical Office of the Department of Computer Science. The dissertation webpage should contain details of the dissertation in an easy-to-understand manner. The students should design the webpage at the beginning of the dissertation work and keep the webpage updated to reflect their latest progress so that their supervisors can closely monitor the progress of the dissertation.  Please consult with your supervisor about the content of the webpage.  This webpage must be ready by the time the students submit the intention to submit dissertation and interim report.
+
+Please click the web page at https://intranet.cs.hku.hk/fyp-msd/faces/info/index.xhtml and enter your HKU Portal UID and PIN to collect your dissertation account. More details about the webpage authoring and file transfer are shown at the "Technical Support" section of the CS Intranet (https://intranet.cs.hku.hk/csintranet).
+
+If you have any questions or need any technical support for your CS personal Computer Account or the CS Dissertation Account for the webpage, you may contact the CS technical staff team at support@cs.hku.hk.
+
+
+
+
+
+File Transfer How-Tos
+Prerequisites
+If connecting from outside the CS departmental network, users are required to login CSVPN. Please refer to:
+https://intranet.cs.hku.hk/csintranet/contents/technical/howto/csvpn/index.jsp
+
+If connecting from within the CS departmental network, CSVPN login is not required.
+
+ 	 
+Connection Procedures
+	Using SFTP command on Linux, OS X and Windoows 10
+ 	
+In the example, suppose you want to upload a file index.php from your local computer to a subfolder "mypage1" of your personal web page on server i.cs.hku.hk.
+
+Open a terminal on your local computer.
+Enter the following command, using your CS account as the username:
+ssh hpan2@i.cs.hku.hk
+If this is the first time you connect to i.cs.hku.hk, you will see the following message. Enter yes to continue:
+The authenticity of host 'i.cs.hku.hk (147.8.179.14)' can't be established.
+ECDSA key fingerprint is SHA256:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.
+Are you sure you want to continue connecting (yes/no)? yes
+Then enter the password of your CS account when prompted:
+hpan2@i.cs.hku.hk's password: 
+Connected to i.cs.hku.hk.
+sftp>
+Change the directory to public_html with the cd command and upload your file index.php to the server with the put command:
+sftp> cd public_html
+Make a subfolder "mypage1" under "public_html", and change the current directory to it. Then upload your file index.php with the put command:
+sftp> mkdir mypage1
+sftp> cd mypage1
+sftp> put index.php
+Uploading index.php to hpan2/public_html/mypage1/index.php
+index.php 100% 8 0.0KB/s 00:00 
+sftp>
+For web/PHP server only, to make the file readable by others and the web server, change the permission of the file to world-readable:
+sftp> chmod 644 index.php
+Enter exit to logout the server.
+Your index.php file can now be access from the web server with the URL https://i.cs.hku.hk/~hpan2/mypage1/index.php
+Notes:
+
+To access your files on academy servers (i.e., H:\ drive in CS laboratories), use academy11.cs.hku.hk or academy21.cs.hku.hk, instead of i.cs.hku.hk, as the server name. To prevent your files from access by others, do not use "chmod 644" on your personal files.
