@@ -35,7 +35,14 @@ def runDiarization(showName, config):
     seg_rate = config.getint('SEGMENT','rate')
     
     KBM_window_length = config.getint('KBM','windowLength')
-  
+    KBM_minG = config.getint('KBM','minimumNumberOfInitialGaussians')
+    KBM_minW = config.getint('KBM','maximumKBMWindowRate')
+    KBM_rel_size = config.getfloat('KBM','relKBMsize')
+    
+    bk_bits = config.getfloat('BINARY_KEY','bitsPerSegmentFactor')
+    init_cluster = config.getint('CLUSTERING','N_init')
+    metric = config['CLUSTERING']['metric']
+    
     # check same:
     allData = extractFeaturesFromSignal(y, sr, nfilters,ncoeff, NFFT, hop)
     allData2 = extractFeatures(wav_path,framelength,frameshift,nfilters,ncoeff)    
@@ -78,118 +85,68 @@ def runDiarization(showName, config):
     #create the KBM
 
     #set the window rate in order to obtain "minimumNumberOfInitialGaussians" gaussians
-    if np.floor((nSpeechFeatures-KBM_window_length)/config.getint('KBM','minimumNumberOfInitialGaussians')) < config.getint('KBM','maximumKBMWindowRate'):
-        windowRate = int(np.floor((np.size(data,0)-KBM_window_length)/config.getint('KBM','minimumNumberOfInitialGaussians')))
+    if np.floor((nSpeechFeatures-KBM_window_length)/KBM_minG) < KBM_minW:
+        windowRate = int(np.floor((np.size(data,0)-KBM_window_length)/KBM_minG))
     else:
-        windowRate = int(config.getint('KBM','maximumKBMWindowRate'))      
-    print('KBM window rate:', windowRate)
+        windowRate = KBM_minW     
       
     poolSize = np.floor((nSpeechFeatures-KBM_window_length)/windowRate)
-    if  config.getint('KBM','useRelativeKBMsize'):
-        kbmSize = int(np.floor(poolSize*config.getfloat('KBM','relKBMsize')))
-    else:
-        kbmSize = int(config.getint('KBM','kbmSize'))        
-    print('Training pool of',int(poolSize),'gaussians with a rate of',int(windowRate),'frames')    
-    kbm, gmPool = trainKBM(data,KBM_window_length,windowRate,kbmSize )    
-    print('Selected',kbmSize,'gaussians from the pool')    
+    
+    kbmSize = int(np.floor(poolSize*KBM_rel_size))
+    kbm, gmPool = trainKBM(data,KBM_window_length,windowRate,kbmSize )      
 
     Vg = getVgMatrix(data,gmPool,kbm,config.getint('BINARY_KEY','topGaussiansPerFrame'))    
-    print(Vg[0])
-    print('Vg shape:', Vg.shape)
-    print('Computing binary keys for all segments... ')
-    segmentBKTable, segmentCVTable = getSegmentBKs(segmentTable, kbmSize, Vg, config.getfloat('BINARY_KEY','bitsPerSegmentFactor'), speechMapping)    
+    segmentBKTable, segmentCVTable = getSegmentBKs(segmentTable, kbmSize, Vg, bk_bits, speechMapping)    
 
-    print(segmentBKTable.shape)
-    print(segmentCVTable.shape)
-    
     t3 = time.time()
     KBM_t = t3 - t2
-    print("Time used for traing KBM and cal BK, CV: ", KBM_t)
+    #print("Time used for traing KBM and cal BK, CV: ", KBM_t)
     
-    print('Performing initial clustering... ')
-    initialClustering = np.digitize(np.arange(numberOfSegments),np.arange(0,numberOfSegments,numberOfSegments/config.getint('CLUSTERING','N_init')))
-    print('done')
-    print('Performing agglomerative clustering... ')    
-    if config.getint('CLUSTERING','linkage'):
-        finalClusteringTable, k = performClusteringLinkage(segmentBKTable, segmentCVTable, config.getint('CLUSTERING','N_init'), config['CLUSTERING']['linkageCriterion'], config['CLUSTERING']['metric'])
-    else:
-        finalClusteringTable, k = performClustering(speechMapping, segmentTable, segmentBKTable, segmentCVTable, Vg, config.getfloat('BINARY_KEY','bitsPerSegmentFactor'), kbmSize, config.getint('CLUSTERING','N_init'), initialClustering, config['CLUSTERING']['metric'])        
-    print('Selecting best clustering...')
-    if config['CLUSTERING_SELECTION']['bestClusteringCriterion'] == 'elbow':
-        bestClusteringID = getBestClustering(config['CLUSTERING_SELECTION']['metric_clusteringSelection'], segmentBKTable, segmentCVTable, finalClusteringTable, k)
-    elif config['CLUSTERING_SELECTION']['bestClusteringCriterion'] == 'spectral':
-        bestClusteringID = getSpectralClustering(config['CLUSTERING_SELECTION']['metric_clusteringSelection'],finalClusteringTable,config.getint('CLUSTERING','N_init'),segmentBKTable,segmentCVTable,k,config.getint('CLUSTERING_SELECTION','sigma'),config.getint('CLUSTERING_SELECTION','percentile'),config.getint('CLUSTERING_SELECTION','maxNrSpeakers'))+1        
-    print('Best clustering:\t',bestClusteringID.astype(int))
-    print('Number of clusters:\t',np.size(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]),0))    
-    
-    print(np.unique(finalClusteringTable))
-    print(finalClusteringTable.shape)
-    print(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]))
-    #print('best clustering results:')
-    #print(finalClusteringTable[:,bestClusteringID.astype(int)-1])
+    initialClustering = np.digitize(np.arange(numberOfSegments),np.arange(0,numberOfSegments,numberOfSegments/init_cluster))
+    finalClusteringTable, k = performClustering(speechMapping, segmentTable, segmentBKTable, segmentCVTable, Vg, bk_bits, kbmSize, init_cluster, initialClustering, metric)        
+    bestClusteringID = getBestClustering(metric, segmentBKTable, segmentCVTable, finalClusteringTable, k)
     
     t4 = time.time()
     clustering_t = t4 - t3
-    print("Time used for clustering: ",clustering_t)
+    #print("Time used for clustering: ",clustering_t)
     
-    
-    
-    
-    if config.getint('RESEGMENTATION','resegmentation') and np.size(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]),0)>1:
-        print('Performing GMM-ML resegmentation...')
-        finalClusteringTableResegmentation,finalSegmentTable = performResegmentation(data,speechMapping, mask,finalClusteringTable[:,bestClusteringID.astype(int)-1],segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
-        print('done')
-        
-        
-        print(finalClusteringTableResegmentation.shape)
-        print(finalSegmentTable.shape)
-        print(segmentTable.shape)
-        '''
-        for i in range(0, 19):
-            print(finalClusteringTableResegmentation[i],finalSegmentTable[i],finalSegmentTable[i][0]-finalSegmentTable[i][2])
-        
-        '''
-        
-        
-        t5 = time.time()
-        reseg_t = t5 - t4
-        print("Time used for resegmentation: ",  reseg_t)
-        
-        tu = t5 - t0
-        print('Total time used:', tu)
-        
-        
 
-        #getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
-        
-        wav_path = config['PATH']['audio']+showName+'.wav'
-        
-        t1=time.time()
-        y, sr = librosa.load(wav_path,sr=None)
-        audio_duration = librosa.get_duration(y, sr=sr)
-        print('load data: ', time.time()- t1)
-        
-        
-        print('audio duration: ', audio_duration)
-        print('real-time factor: ', tu / audio_duration)
-        
-        print(wav_path)
-        
-        print(feature_t, SAD_t, KBM_t, clustering_t, reseg_t, tu)
-        
-        #wav_path = './audio_test/2.wav'
-        #print(config['PATH']['audio']+showName+'.wav')
-        
-        
-        speakerSlice = getSegResultForPlot(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
-        p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6))
-        p.draw()
-        p.plot.show()
-        
-        
-    else:
-        getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
+    finalClusteringTableResegmentation,finalSegmentTable = performResegmentation(data,speechMapping, mask,finalClusteringTable[:,bestClusteringID.astype(int)-1],segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
+
+    t5 = time.time()
+    reseg_t = t5 - t4
+    print("Time used for resegmentation: ",  reseg_t)
+
+    tu = t5 - t0
+    print('Total time used:', tu)
+
+
+
+    #getSegmentationFile(config['OUTPUT']['format'],frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
+
+
+    print('audio duration: ', audio_duration)
+    print('real-time factor: ', tu / audio_duration)
+
+
+    print(feature_t, SAD_t, KBM_t, clustering_t, reseg_t, tu)
+
+    #wav_path = './audio_test/2.wav'
+    #print(config['PATH']['audio']+showName+'.wav')
+
     
+    speakerSlice = getSegResultForPlot('RTTM',frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, 'test', 'RTTM', 'rttm')
+    
+    '''
+    p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6))
+    p.draw()
+    p.plot.show()
+    ''' 
+        
+    
+    #getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
+    
+    '''
     if config.getint('OUTPUT','returnAllPartialSolutions'):
         if not os.path.isdir(config['PATH']['output']):
             os.mkdir(config['PATH']['output'])
@@ -200,7 +157,7 @@ def runDiarization(showName, config):
             os.mkdir(outputPathInd)
         for i in np.arange(k):
             getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'), segmentTable, finalClusteringTable[:,i], showName, showName+'_'+str(np.size(np.unique(finalClusteringTable[:,i]),0))+'_spk', outputPathInd, config['EXTENSION']['output'])        
-    
+    '''
         
     print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
     
