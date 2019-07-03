@@ -14,45 +14,56 @@ import time
 import librosa
 
 def runDiarization(showName, config):   
+    
+    wav_path = config['PATH']['audio']+showName+'.wav'
+        
+    y, sr = librosa.load(wav_path,sr=None)
+    audio_duration = librosa.get_duration(y, sr=sr)
+    
+    framelength = config.getfloat('FEATURES','framelength')
+    frameshift = config.getfloat('FEATURES','frameshift')
+    nfilters = config.getint('FEATURES','nfilters')
+    ncoeff = config.getint('FEATURES','ncoeff')
+    
+    
+    frame_length_inSample=framelength*sr
+    hop = int(frameshift*sr)
+    NFFT=int(2**np.ceil(np.log2(frame_length_inSample)))
+    
+    seg_length = config.getint('SEGMENT','length')
+    seg_incre = config.getint('SEGMENT','increment')
+    seg_rate = config.getint('SEGMENT','rate')
+    
+    KBM_window_length = config.getint('KBM','windowLength')
+  
+    # check same:
+    allData = extractFeaturesFromSignal(y, sr, nfilters,ncoeff, NFFT, hop)
+    allData2 = extractFeatures(wav_path,framelength,frameshift,nfilters,ncoeff)    
+    print((allData == allData2).all())
+    nFeatures = allData.shape[0]   
+    
+    maskSAD = getSADfromSignal(y, sr, frameshift, nFeatures)
+    maskSAD2 = getSADfile(config,'2',nFeatures)
+    print((maskSAD == maskSAD2).all())
+    
     t0 = time.time()  
-    print('showName\t\t',showName)
-    print('Extracting features')  
     
-    if config.getint('GENERAL','performFeatureExtraction'):
-        allData=extractFeatures(config['PATH']['audio']+showName+config['EXTENSION']['audio'],config.getfloat('FEATURES','framelength'),config.getfloat('FEATURES','frameshift'),config.getint('FEATURES','nfilters'),config.getint('FEATURES','ncoeff'))    
-    else:
-        allData=getFeatures(config['PATH']['features']+showName+config['EXTENSION']['features'])
+    
+    allData = extractFeaturesFromSignal(y, sr, nfilters,ncoeff, NFFT, hop)
     nFeatures = allData.shape[0]    
-    print('shape of features:', allData.shape)
-    print('Initial number of features\t',nFeatures) 
-    
+
     
     t1 = time.time()
     feature_t = t1 - t0
-    print("Time used for extracting features:", feature_t)
     
-    if os.path.isfile(config['PATH']['UEM']+showName+config['EXTENSION']['UEM']):
-        maskUEM = readUEMfile(config['PATH']['UEM'],showName,config['EXTENSION']['UEM'],nFeatures,config.getfloat('FEATURES','frameshift'))
-    else:
-        print('UEM file does not exist. The complete audio content is considered.')
-        maskUEM = np.ones([1,nFeatures])     
-        
-    if os.path.isfile(config['PATH']['SAD']+showName+config['EXTENSION']['SAD']) and not(config.getint('GENERAL','performVAD')):
-        maskSAD = readSADfile(config['PATH']['SAD'],showName,config['EXTENSION']['SAD'],nFeatures,config.getfloat('FEATURES','frameshift'),config['GENERAL']['SADformat']) 
-    else:
-        print('SAD file does not exist or automatic VAD is enabled in the config. VAD is applied and saved at %s.\n'%(config['PATH']['SAD']+showName+'.lab'))
-        maskSAD = getSADfile(config,showName,nFeatures)
-   
+    maskUEM = np.ones([1,nFeatures])     
+    maskSAD = getSADfromSignal(y, sr, frameshift, nFeatures)
+    
     t2 = time.time()
     SAD_t = t2 - t1
-    print("Time used for SAD: ", SAD_t)
-    
-    print('shape of SAD mask', maskSAD.shape)
-    
-    mask = np.logical_and(maskUEM,maskSAD)    
+
+    mask = np.logical_and(maskUEM, maskSAD)    
     mask = mask[0][0:nFeatures]
-    
-    
     
     nSpeechFeatures=np.sum(mask)
     speechMapping = np.zeros(nFeatures)
@@ -61,29 +72,25 @@ def runDiarization(showName, config):
     speechMapping[np.nonzero(mask)] = np.arange(1,nSpeechFeatures+1)
     data=allData[np.where(mask==1)]
     del allData        
-    segmentTable=getSegmentTable(mask,speechMapping,config.getint('SEGMENT','length'),config.getint('SEGMENT','increment'),config.getint('SEGMENT','rate'))
+    
+    segmentTable=getSegmentTable(mask,speechMapping, seg_length, seg_incre, seg_rate)
     numberOfSegments=np.size(segmentTable,0)
-    print('Number of speech features\t',nSpeechFeatures)
-    print('Number of segements \t', numberOfSegments)
-    
     #create the KBM
-    print('Training the KBM... ')
-    
 
     #set the window rate in order to obtain "minimumNumberOfInitialGaussians" gaussians
-    if np.floor((nSpeechFeatures-config.getint('KBM','windowLength'))/config.getint('KBM','minimumNumberOfInitialGaussians')) < config.getint('KBM','maximumKBMWindowRate'):
-        windowRate = int(np.floor((np.size(data,0)-config.getint('KBM','windowLength'))/config.getint('KBM','minimumNumberOfInitialGaussians')))
+    if np.floor((nSpeechFeatures-KBM_window_length)/config.getint('KBM','minimumNumberOfInitialGaussians')) < config.getint('KBM','maximumKBMWindowRate'):
+        windowRate = int(np.floor((np.size(data,0)-KBM_window_length)/config.getint('KBM','minimumNumberOfInitialGaussians')))
     else:
         windowRate = int(config.getint('KBM','maximumKBMWindowRate'))      
     print('KBM window rate:', windowRate)
       
-    poolSize = np.floor((nSpeechFeatures-config.getint('KBM','windowLength'))/windowRate)
+    poolSize = np.floor((nSpeechFeatures-KBM_window_length)/windowRate)
     if  config.getint('KBM','useRelativeKBMsize'):
         kbmSize = int(np.floor(poolSize*config.getfloat('KBM','relKBMsize')))
     else:
         kbmSize = int(config.getint('KBM','kbmSize'))        
     print('Training pool of',int(poolSize),'gaussians with a rate of',int(windowRate),'frames')    
-    kbm, gmPool = trainKBM(data,config.getint('KBM','windowLength'),windowRate,kbmSize )    
+    kbm, gmPool = trainKBM(data,KBM_window_length,windowRate,kbmSize )    
     print('Selected',kbmSize,'gaussians from the pool')    
 
     Vg = getVgMatrix(data,gmPool,kbm,config.getint('BINARY_KEY','topGaussiansPerFrame'))    
