@@ -1,8 +1,3 @@
-# AUTHORS
-# Jose PATINO, EURECOM, Sophia-Antipolis, France, 2019
-# http://www.eurecom.fr/en/people/patino-jose
-# Contact: patino[at]eurecom[dot]fr, josempatinovillar[at]gmail[dot]com
-
 import os, sys, glob
 import configparser
 from diarizationFunctions import *
@@ -17,7 +12,7 @@ def runDiarization(showName, config):
     
     wav_path = config['PATH']['audio']+showName+'.wav'
         
-    y, sr = librosa.load(wav_path,sr=None)
+    y_total, sr = librosa.load(wav_path,sr=None)
     audio_duration = librosa.get_duration(y, sr=sr)
     
     framelength = config.getfloat('FEATURES','framelength')
@@ -44,15 +39,32 @@ def runDiarization(showName, config):
     metric = config['CLUSTERING']['metric']
     
     # check same:
-    allData = extractFeaturesFromSignal(y, sr, nfilters,ncoeff, NFFT, hop)
+    allData = extractFeaturesFromSignal(y_total, sr, nfilters,ncoeff, NFFT, hop)
     allData2 = extractFeatures(wav_path,framelength,frameshift,nfilters,ncoeff)    
-    print((allData == allData2).all())
+    print('features comparison:', (allData == allData2).all())
     nFeatures = allData.shape[0]   
     
-    maskSAD = getSADfromSignal(y, sr, frameshift, nFeatures)
+    maskSAD = getSADfromSignal(y_total, sr, frameshift, nFeatures)
     maskSAD2 = getSADfile(config,'2',nFeatures)
-    print((maskSAD == maskSAD2).all())
+    print('SAD comparison:', (maskSAD == maskSAD2).all())
     
+    
+    step = 1
+    i = step
+    y = [] 
+    
+    while i < audio_duration:
+        if i + step >= audio_duration:
+            y = y_total
+        else:
+            y = y_total[0 : i * sr - 1]
+            
+        print(i, len(y_partial) / sr, len(y_partial))
+        i = i + step
+    
+    print(y == y_total)
+    
+    '''
     t0 = time.time()  
     
     
@@ -136,6 +148,8 @@ def runDiarization(showName, config):
 
     
     speakerSlice = getSegResultForPlot('RTTM',frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, 'test', 'RTTM', 'rttm')
+    '''
+    
     
     '''
     p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6))
@@ -146,18 +160,7 @@ def runDiarization(showName, config):
     
     #getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
     
-    '''
-    if config.getint('OUTPUT','returnAllPartialSolutions'):
-        if not os.path.isdir(config['PATH']['output']):
-            os.mkdir(config['PATH']['output'])
-        outputPathInd = config['PATH']['output']+ config['EXPERIMENT']['name'] + '/' + showName + '/'
-        if not os.path.isdir(config['PATH']['output'] + config['EXPERIMENT']['name']):
-            os.mkdir(config['PATH']['output'] + config['EXPERIMENT']['name'])
-        if not os.path.isdir(outputPathInd):            
-            os.mkdir(outputPathInd)
-        for i in np.arange(k):
-            getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'), segmentTable, finalClusteringTable[:,i], showName, showName+'_'+str(np.size(np.unique(finalClusteringTable[:,i]),0))+'_spk', outputPathInd, config['EXTENSION']['output'])        
-    '''
+
         
     print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
     
@@ -171,24 +174,7 @@ if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read(configFile)
     
-    if config.getint('GENERAL','performFeatureExtraction'):
-        # Audio files are searched at the corresponding folder
-        showNameList = sorted(glob.glob(config['PATH']['audio']+'*'+config['EXTENSION']['audio']))
-    else:
-        # Feature files are searched if feature extraction is disabled:
-        showNameList = sorted(glob.glob(config['PATH']['features']+'*'+config['EXTENSION']['features']))
-        
-    # If the output file already exists from a previous call it is deleted
-    if os.path.isfile(config['PATH']['output']+config['EXPERIMENT']['name']+config['EXTENSION']['output']):
-        os.remove(config['PATH']['output']+config['EXPERIMENT']['name']+config['EXTENSION']['output'])
-                
-    # Output folder is created
-    if not os.path.isdir(config['PATH']['output']):
-        os.mkdir(config['PATH']['output'])
-
-    # Files are diarized one by one
-    for idx,showName in enumerate(showNameList):
-        if os.path.basename(showName) == '2.wav':
-        #if os.path.basename(showName) == 'chinese_same.wav':
-            print('\nProcessing file',idx+1,'/',len(showNameList))
-            runDiarization(os.path.splitext(os.path.basename(showName))[0], config)
+    filename = '2.wav'
+   
+            
+    runDiarization(filename, config)
