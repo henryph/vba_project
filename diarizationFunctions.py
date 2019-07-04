@@ -824,6 +824,59 @@ def getSegResultForPlotlater(frameshift,finalSegmentTable, finalClusteringTable,
     outf.write('\n')
     outf.close()
 
+def readSegResultforPlot(filename):
+    
+    from collections import OrderedDict
+    
+    DictSpeakerSlice = OrderedDict()
+    DictSeg = OrderedDict()
+    
+    f = open(filename, "r")
+    for row in f:
+        r = row.split(" ")
+        if r[1] not in DictSeg.keys():
+            DictSeg[r[1]] = np.empty([0,3])
+        
+        DictSeg[r[1]] = np.vstack((DictSeg[r[1]],[r[3],r[4],r[5]])) 
+        
+    f.close()    
+
+    for seconds, seg in DictSeg.items():
+        
+        speakerSlice = {}
+
+        last_speaker = 1
+
+        for i in np.arange(len(ListSeg)):
+
+            speaker = str(seg[i, 2].astype(int))
+            timeDict = {}
+            timeDict['start'] = seg[i, 0]* 1000 #milliseconds
+            timeDict['stop'] = timeDict['start'] + seg[i, 1]* 1000
+
+
+            # remove speaker change with duration < 0.5s
+            if i > 0 and i < np.size(seg,0) - 1:
+                if seg[i, 1] <= 0.5 and (speaker != last_speaker or speaker != str(seg[i + 1, 2].astype(int))):
+                    speaker = last_speaker
+
+            if speaker in speakerSlice:
+                speakerSlice[speaker].append(timeDict)
+            else:
+                speakerSlice[speaker] = [timeDict]
+
+            last_speaker = speaker
+            
+            
+            DictSpeakerSlice[seconds] = speakerSlice()
+    
+    for seconds, speakerslice in DictSpeakerSlice.items():
+        print('second: ', seconds, ' keys: ', speakerslice.keys(), 'values: ', speakerslice.values())
+    
+    
+    return DictSpeakerSlice
+        
+        
 class HTKFile:
     
     #Code from: https://github.com/danijel3/PyHTK
