@@ -824,6 +824,7 @@ def getSegResultForPlotlater(frameshift,finalSegmentTable, finalClusteringTable,
     outf.write('\n')
     outf.close()
 
+
 def readSegResultforPlot(filename):
     
     from collections import OrderedDict
@@ -832,12 +833,30 @@ def readSegResultforPlot(filename):
     DictSeg = OrderedDict()
     
     f = open(filename, "r")
+    st = 0
+    dt = 0
+    last_sec = 0
     for row in f:
         r = row.split(" ")
-        if r[1] not in DictSeg.keys():
-            DictSeg[r[1]] = np.empty([0,3])
+        key = int(r[1]) - 1
+        if key not in DictSeg.keys():
+            DictSeg[key] = np.empty([0,3])
         
-        DictSeg[r[1]] = np.vstack((DictSeg[r[1]],[r[3],r[4],r[5]])) 
+        st = float(r[3])
+        dt = float(r[4])
+        #et = st + dt
+        
+        
+        if last_sec == key:
+        
+            last_et = DictSeg[key][-1, 0].astype(float) + DictSeg[key][-1, 1].astype(float)
+            if st < last_et:
+                #print(key, st, last_et)
+                st = last_et
+
+        DictSeg[key] = np.vstack((DictSeg[key],[st, dt, r[5].replace('speaker','')])) 
+
+        last_sec = key
         
     f.close()    
 
@@ -847,20 +866,26 @@ def readSegResultforPlot(filename):
 
         last_speaker = 1
 
-        for i in np.arange(len(ListSeg)):
-
+        for i in np.arange(np.size(seg,0)):
+            
             speaker = str(seg[i, 2].astype(int))
             timeDict = {}
-            timeDict['start'] = seg[i, 0]* 1000 #milliseconds
-            timeDict['stop'] = timeDict['start'] + seg[i, 1]* 1000
-
+            timeDict['start'] = seg[i, 0].astype(float)* 1000 #milliseconds
+            timeDict['stop'] = timeDict['start'] + seg[i, 1].astype(float)* 1000
+            
+            #print(i, np.size(seg,0), seg[i, 0], seg[i, 1], seg[i, 2], timeDict['start'], timeDict['stop'])
 
             # remove speaker change with duration < 0.5s
+            '''
             if i > 0 and i < np.size(seg,0) - 1:
-                if seg[i, 1] <= 0.5 and (speaker != last_speaker or speaker != str(seg[i + 1, 2].astype(int))):
+                if seg[i, 1].astype(float) <= 0.5 and (speaker != last_speaker or speaker != str(seg[i + 1, 2].astype(int))):
                     speaker = last_speaker
-
+            '''
+            
+            
             if speaker in speakerSlice:
+
+                    
                 speakerSlice[speaker].append(timeDict)
             else:
                 speakerSlice[speaker] = [timeDict]
@@ -868,15 +893,15 @@ def readSegResultforPlot(filename):
             last_speaker = speaker
             
             
-            DictSpeakerSlice[seconds] = speakerSlice()
+            DictSpeakerSlice[seconds] = speakerSlice
     
     for seconds, speakerslice in DictSpeakerSlice.items():
-        print('second: ', seconds, ' keys: ', speakerslice.keys(), 'values: ', speakerslice.values())
-    
+        print('second: ', seconds, speakerslice)
+        
     
     return DictSpeakerSlice
-        
-        
+
+
 class HTKFile:
     
     #Code from: https://github.com/danijel3/PyHTK
