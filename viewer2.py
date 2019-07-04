@@ -60,7 +60,7 @@ class PlotDiar:
             self.timer.add_callback(self._update_result)
             self.timer.start()
 
-        self.timeline = self.ax.plot([0, 0], [0, 0], color='r')[-1]
+        #self.timeline = self.ax.plot([0, 0], [0, 0], color='r')[-1]
         
         self.allmap = map
         self.map = map
