@@ -56,7 +56,7 @@ class PlotDiar:
         self.audio = None
         if self.wav is not None and self.gui:
             self.audio = AudioPlayer(wav)
-            self.timer = self.fig.canvas.new_timer(interval=1000)
+            self.timer = self.fig.canvas.new_timer(interval=500)
             self.timer.add_callback(self._update_result)
             self.timer.start()
 
@@ -77,6 +77,8 @@ class PlotDiar:
             self.fig.canvas.draw()
         else:
             print('No data to draw for:', int_t)
+            
+        self._draw_info(t)
     
     
     def _draw_timeline(self, t):
