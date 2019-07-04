@@ -3,7 +3,7 @@ import configparser
 from diarizationFunctions import *
 import numpy as np
 sys.path.append('visualization')
-from viewer import PlotDiar
+from viewer2 import PlotDiar
 
 import time
 import librosa
@@ -140,6 +140,16 @@ def runDiarization(showName, config):
 
         
     print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+
+    
+def plotRealtimeResult(showName):
+    wav_path = config['PATH']['audio']+showName
+    result_path = './out/' + showName.replace('.wav') + '.rttm'
+    speakerSlice = readSegResultforPlot(result_path)
+    p = PlotDiar(map=speakerSlice, wav=wav_path, duration = 120, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ', gui=True)
+    p.plot.show()
+    
+
     
 if __name__ == "__main__":     
     # If a config file in INI format is passed by argument line then it's used. 
