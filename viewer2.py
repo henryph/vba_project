@@ -8,7 +8,7 @@ class PlotDiar:
     """
     A viewer of segmentation
     """
-    def __init__(self, map=None, wav=None, title='', gui=False, pick=False, vgrid=False, size=(18, 9)):
+    def __init__(self, map=None, wav=None, duration=120, title='', gui=False, vgrid=False, size=(18, 9)):
         self.rect_picked = None
         self.rect_color = (0.0, 0.6, 1.0, 1.0)  # '#0099FF'
         self.rect_selected_color = (0.75, 0.75, 0, 1.0)  # 'y'
@@ -30,7 +30,7 @@ class PlotDiar:
         plot.rcParams['keymap.save'] = 'ctrl+s'
         # plot.rcParams.update({'font.family': 'courrier'})
 
-        self.pick = pick
+
         self.gui = gui
         self.vgrid = vgrid
         self.fig = plot.figure(figsize=size, facecolor='white', tight_layout=True)
@@ -42,27 +42,43 @@ class PlotDiar:
         if self.gui:
             cids.append(
                 self.fig.canvas.mpl_connect('key_press_event', self._on_keypress))
-            cids.append(
-                self.fig.canvas.mpl_connect('button_press_event', self._on_click))
-            if pick:
-                cids.append(self.fig.canvas.mpl_connect('pick_event', self._on_pick))
+            #cids.append(
+            #    self.fig.canvas.mpl_connect('button_press_event', self._on_click))
+
         self.height = 5
         self.maxx = 0
         self.maxy = 0
+        
+        self.maxx = duration
+        
         self.end_play = 0
         self.wav = wav
         self.audio = None
         if self.wav is not None and self.gui:
             self.audio = AudioPlayer(wav)
-            self.timer = self.fig.canvas.new_timer(interval=10)
-            self.timer.add_callback(self._update_timeline)
+            self.timer = self.fig.canvas.new_timer(interval=1000)
+            self.timer.add_callback(self._update_result)
             self.timer.start()
 
         self.timeline = self.ax.plot([0, 0], [0, 0], color='r')[-1]
+        
+        self.allmap = map
         self.map = map
         self.time_stamp = list()
         self.time_stamp_idx = 0
-
+    
+    def _update_result(self):
+        t = self.audio.time()
+        int_t = int(t)
+        if int_t in self.allmap.keys():
+            print('drawing: ', int_t)
+            self.map = self.allmap[int_t]
+            self.draw()
+            self.fig.canvas.draw()
+        else:
+            print('No data to draw for:', int_t)
+    
+    
     def _draw_timeline(self, t):
         """
         Draw the timeline a position t
@@ -98,16 +114,7 @@ class PlotDiar:
         ch = 'time:{:s} ({:.3f} sec {:d} frame)'.format(self._hms(t), t,
                                                         int(t * 100))
         ch2 = '\n\n\n'
-        if self.rect_picked is not None:
-            s = self.rect_picked.get_x()
-            w = self.rect_picked.get_width()
-            e = s + w
-            ch2 = 'segment  start: {:20s} ({:8.2f} sec {:8d} frame)\n'.format(
-                self._hms(s), s, int(s * 100))
-            ch2 += 'segment   stop: {:20s} ({:8.2f} sec {:8d} frame)\n'.format(
-                self._hms(e), e, int(e * 100))
-            ch2 += 'segment lenght: {:20s} ({:8.2f} sec {:8d} frame)\n'.format(
-                self._hms(w), w, int(w * 100))
+
 
         plot.xlabel(ch + '\n' + ch2)
 
@@ -123,19 +130,19 @@ class PlotDiar:
             labels_pos.append(y + self.height // 2)
             for row in self.map[cluster]:
                 x = row['start'] /1000
-                self.time_stamp.append(x)
-                self.time_stamp.append(row['stop'] /1000)
+                #self.time_stamp.append(x)
+                #self.time_stamp.append(row['stop'] /1000)
                 w = row['stop'] /1000 - row['start'] /1000
-                self.maxx = max(self.maxx, row['stop'] /1000)
+                
+                #self.maxx = max(self.maxx, row['stop'] /1000)
+                
                 c = self.cluster_colors[i%len(self.cluster_colors)]
                 rect = plot.Rectangle((x, y), w, self.height,
-                                      color=c, picker=self.pick)
+                                      color=c)
                 self.ax.add_patch(rect)
             y += self.height
-        if self.gui:
-            plot.xlim([0, min(600, self.maxx)])
-        else:
-            plot.xlim([0, self.maxx])
+
+        plot.xlim([0, self.maxx])
 
         plot.ylim([0, y])
         plot.yticks(labels_pos, labels)
@@ -150,14 +157,15 @@ class PlotDiar:
         if self.gui:
             self._draw_info(0)
         plot.tight_layout()
-        self.time_stamp = list(set(self.time_stamp))
-        self.time_stamp.sort()
-
+        #self.time_stamp = list(set(self.time_stamp))
+        #self.time_stamp.sort()
+        
+        '''
         if self.vgrid:
             for x in  self.time_stamp:
                 self.ax.plot([x, x], [0, self.maxy], linestyle=':',
                              color='#AAAAAA')
-
+        '''
 
     def _dec_right(self, min, max):
         """
@@ -231,6 +239,7 @@ class PlotDiar:
 
         self.fig.canvas.draw()
 
+
     def _on_click(self, event):
         """
         manage the mouse event
@@ -241,45 +250,6 @@ class PlotDiar:
                 self.audio.pause()
                 self.audio.seek(event.xdata)
             self._draw_timeline(event.xdata)
-            self.fig.canvas.draw()
-
-    def _on_pick(self, event):
-        """
-        manage the selection of a segment
-        :param event: a picked event
-        """
-        if isinstance(event.artist, Rectangle) and event.mouseevent.dblclick:
-            print('on pick dbclick')
-            rect = event.artist
-            x, y = rect.get_xy()
-            w = rect.get_width()
-            c = rect.get_fc()
-            if self.rect_picked is not None:
-                if self._colors_are_equal(c, self.rect_selected_color):
-                    rect.set_color(self.rect_color)
-                    self.rect_picked = None
-                    self.end_play = self.maxx
-                else:
-                    self.rect_picked.set_color(self.rect_color)
-                    rect.set_color(self.rect_selected_color)
-                    self.rect_picked = rect
-                    if self.audio is not None:
-                        self.audio.pause()
-                        self.audio.seek(x)
-                    self.time_stamp_idx = self.time_stamp.index(x)
-                    self.end_play = x + w
-                    self._draw_timeline(x)
-            else:
-                rect.set_color(self.rect_selected_color)
-                self.rect_picked = rect
-
-                if self.audio is not None:
-                    self.audio.pause()
-                    self.audio.seek(x)
-                self.time_stamp_idx = self.time_stamp.index(x)
-                self.end_play = x + w
-                self._draw_timeline(x)
-
             self.fig.canvas.draw()
 
     @classmethod
