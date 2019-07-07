@@ -440,7 +440,7 @@ def performClusteringLinkage(segmentBKTable, segmentCVTable, N_init, linkageCrit
     for i in np.arange(N_init):
       clusteringTable[:,i] = cluster.hierarchy.cut_tree(Z,N_init-i).T+1  
     k=N_init
-    print('done')
+    #print('done')
     return clusteringTable, k
    
 def performClustering( speechMapping, segmentTable, segmentBKTable, segmentCVTable, Vg, bitsPerSegmentFactor, kbmSize, N_init, initialClustering, clusteringMetric):
@@ -498,7 +498,7 @@ def performClustering( speechMapping, segmentTable, segmentBKTable, segmentCVTab
         for l in np.arange(np.size(segmentsToBinarize,0)):
             M = np.append(M,np.arange(int(segmentTable[segmentsToBinarize][:][l,1]),int(segmentTable[segmentsToBinarize][:][l,2])+1))
         clustersBKTable[R,:], clustersCVTable[R,:]=binarizeFeatures(kbmSize,Vg[np.array(speechMapping[np.array(M,dtype='int')],dtype='int')-1].T,bitsPerSegmentFactor)
-    print('done')
+    #print('done')
     return clusteringTable, k
   
 def calcClusters(clustersCVTable,clustersBKTable,activeClusters,clusteringTable,N_init,segmentTable,kbmSize,speechMapping,Vg,bitsPerSegmentFactor):    
@@ -686,7 +686,10 @@ def performResegmentation(data, speechMapping,mask,finalClusteringTable,segmentT
         currentPoint = changes[i]+1
     addedRow = np.hstack((np.tile(np.where(speechMapping==currentPoint)[0],(1,2)),  np.tile(np.where(speechMapping==numberOfSpeechFeatures)[0],(1,2))))
     finalSegmentTable = np.vstack((finalSegmentTable,addedRow[0]))
-    finalClusteringTableResegmentation = np.vstack((finalClusteringTableResegmentation,segOut[(changes[i]+1).astype(int)]))    
+    try:
+        finalClusteringTableResegmentation = np.vstack((finalClusteringTableResegmentation,segOut[(changes[i]+1).astype(int)]))    
+    except:
+        finalClusteringTableResegmentation = np.vstack((finalClusteringTableResegmentation,segOut[(changes[i]).astype(int)]))    
     return finalClusteringTableResegmentation,finalSegmentTable  
 
 def getSegmentationFile(format, frameshift,finalSegmentTable, finalClusteringTable, showName, filename, outputPath, outputExt):
@@ -752,7 +755,7 @@ def getSegResultForPlot(frameshift,finalSegmentTable, finalClusteringTable):
     seg = np.vstack((seg,[seg1,seg2,seg3])) 
     
     speakerSlice = {}
-    last_speaker = 1
+    last_speaker = '1'
     
     for i in np.arange(np.size(seg,0)):
         
@@ -819,7 +822,7 @@ def getSegResultForPlotlater(frameshift,finalSegmentTable, finalClusteringTable,
     solution[-1]=solution[-1][0:-1]     
     
     
-    outf = open('./out/'+showName+'.rttm',"a")    
+    outf = open('./out/'+showName.replace('.wav', '')+'.rttm',"a")    
     outf.writelines(solution)
     outf.write('\n')
     outf.close()
@@ -843,18 +846,19 @@ def readSegResultforPlot(filename):
             DictSeg[key] = np.empty([0,3])
         
         st = float(r[3])
-        dt = float(r[4])
+        dt = float(r[4]) - 0.01
         #et = st + dt
         
-        
+        '''
         if last_sec == key:
-        
+            
             last_et = DictSeg[key][-1, 0].astype(float) + DictSeg[key][-1, 1].astype(float)
             if st < last_et:
                 #print(key, st, last_et)
                 st = last_et
-
-        DictSeg[key] = np.vstack((DictSeg[key],[st, dt, r[5].replace('speaker','')])) 
+        '''
+        if dt >= 0.04:
+            DictSeg[key] = np.vstack((DictSeg[key],[st, dt, r[5].replace('speaker','')])) 
 
         last_sec = key
         
@@ -864,7 +868,7 @@ def readSegResultforPlot(filename):
         
         speakerSlice = {}
 
-        last_speaker = 1
+        last_speaker = '1'
 
         for i in np.arange(np.size(seg,0)):
             
@@ -876,16 +880,15 @@ def readSegResultforPlot(filename):
             #print(i, np.size(seg,0), seg[i, 0], seg[i, 1], seg[i, 2], timeDict['start'], timeDict['stop'])
 
             # remove speaker change with duration < 0.5s
-            '''
+            
             if i > 0 and i < np.size(seg,0) - 1:
                 if seg[i, 1].astype(float) <= 0.5 and (speaker != last_speaker or speaker != str(seg[i + 1, 2].astype(int))):
                     speaker = last_speaker
-            '''
+           
             
             
             if speaker in speakerSlice:
 
-                    
                 speakerSlice[speaker].append(timeDict)
             else:
                 speakerSlice[speaker] = [timeDict]
@@ -895,10 +898,26 @@ def readSegResultforPlot(filename):
             
             DictSpeakerSlice[seconds] = speakerSlice
     
-    for seconds, speakerslice in DictSpeakerSlice.items():
-        print('second: ', seconds, speakerslice)
-        
     
+    previous_second = 0
+    previous_speakers = 0
+    last_key = next(reversed(DictSpeakerSlice))
+    for second, speakerslice in DictSpeakerSlice.items():
+        #print('second: ', second, speakerslice, type(second))
+        
+        this_speaker = len(speakerslice.keys())
+        if previous_second != 0 and second != last_key:
+ 
+            next_speakers = len(DictSpeakerSlice[second + 1].keys())
+
+            if (this_speaker != previous_speakers and this_speaker != next_speakers):
+                DictSpeakerSlice[second]= DictSpeakerSlice[previous_second]
+                #print('second: ', second, ' speakers: ', previous_speakers, this_speaker, next_speakers)
+        
+        previous_second = second
+        previous_speakers = this_speaker
+     
+            
     return DictSpeakerSlice
 
 
