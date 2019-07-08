@@ -467,6 +467,7 @@ def performClustering( speechMapping, segmentTable, segmentBKTable, segmentCVTab
         if np.sum(activeClusters)==1:
             break          
         clustersStillActive=np.zeros([1,N_init])
+        # Calculate similarities btw CVs of all segments
         segmentToClustersSimilarityMatrix = binaryKeySimilarity_cdist(clusteringMetric,segmentBKTable,segmentCVTable,clustersBKTable,clustersCVTable)
         # clusteringTable[:,k] = finalClusteringTable[:,k] = np.argmax(segmentToClustersSimilarityMatrix,axis=1)+1
         clusteringTable[:,k] = finalClusteringTable[:,k] = np.nanargmax(segmentToClustersSimilarityMatrix,axis=1)+1

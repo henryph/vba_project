@@ -14,6 +14,9 @@ import time
 import librosa
 
 def runDiarization(showName, config):   
+    
+    wav_path = config['PATH']['audio']+showName+'.wav'
+    
     t0 = time.time()  
     print('showName\t\t',showName)
     print('Extracting features')  
@@ -66,6 +69,7 @@ def runDiarization(showName, config):
     print('Number of speech features\t',nSpeechFeatures)
     print('Number of segements \t', numberOfSegments)
     
+    print(segmentTable[0])
     #create the KBM
     print('Training the KBM... ')
     
@@ -85,28 +89,42 @@ def runDiarization(showName, config):
     print('Training pool of',int(poolSize),'gaussians with a rate of',int(windowRate),'frames')    
     kbm, gmPool = trainKBM(data,config.getint('KBM','windowLength'),windowRate,kbmSize )    
     print('Selected',kbmSize,'gaussians from the pool')    
-
+    
     Vg = getVgMatrix(data,gmPool,kbm,config.getint('BINARY_KEY','topGaussiansPerFrame'))    
     print(Vg[0])
     print('Vg shape:', Vg.shape)
+    
+    t3 = time.time()
+    KBM_t = t3 - t2
+    print("Time used for traing KBM: ", KBM_t)
+    
     print('Computing binary keys for all segments... ')
     segmentBKTable, segmentCVTable = getSegmentBKs(segmentTable, kbmSize, Vg, config.getfloat('BINARY_KEY','bitsPerSegmentFactor'), speechMapping)    
 
     print(segmentBKTable.shape)
     print(segmentCVTable.shape)
     
-    t3 = time.time()
-    KBM_t = t3 - t2
-    print("Time used for traing KBM and cal BK, CV: ", KBM_t)
+    t4 = time.time()
+    BKCV_t = t4 - t3
+    print("Time used to cal BK, CV: ", BKCV_t)
     
     print('Performing initial clustering... ')
     initialClustering = np.digitize(np.arange(numberOfSegments),np.arange(0,numberOfSegments,numberOfSegments/config.getint('CLUSTERING','N_init')))
+    
+    print('initial clustering:', initialClustering.size)
+    #print('initial clustering:', initialClustering)
+    
     print('done')
     print('Performing agglomerative clustering... ')    
     if config.getint('CLUSTERING','linkage'):
         finalClusteringTable, k = performClusteringLinkage(segmentBKTable, segmentCVTable, config.getint('CLUSTERING','N_init'), config['CLUSTERING']['linkageCriterion'], config['CLUSTERING']['metric'])
     else:
         finalClusteringTable, k = performClustering(speechMapping, segmentTable, segmentBKTable, segmentCVTable, Vg, config.getfloat('BINARY_KEY','bitsPerSegmentFactor'), kbmSize, config.getint('CLUSTERING','N_init'), initialClustering, config['CLUSTERING']['metric'])        
+   
+    t5 = time.time()
+    clustering_t = t5 - t4
+    print("Time used for clustering: ",clustering_t)
+    
     print('Selecting best clustering...')
     if config['CLUSTERING_SELECTION']['bestClusteringCriterion'] == 'elbow':
         bestClusteringID = getBestClustering(config['CLUSTERING_SELECTION']['metric_clusteringSelection'], segmentBKTable, segmentCVTable, finalClusteringTable, k)
@@ -121,9 +139,9 @@ def runDiarization(showName, config):
     #print('best clustering results:')
     #print(finalClusteringTable[:,bestClusteringID.astype(int)-1])
     
-    t4 = time.time()
-    clustering_t = t4 - t3
-    print("Time used for clustering: ",clustering_t)
+    t6 = time.time()
+    best_clustering_t = t6 - t5
+    print("Time used for best clustering: ",best_clustering_t)
     
     
     
@@ -144,18 +162,17 @@ def runDiarization(showName, config):
         '''
         
         
-        t5 = time.time()
-        reseg_t = t5 - t4
+        t7 = time.time()
+        reseg_t = t7 - t6
         print("Time used for resegmentation: ",  reseg_t)
         
-        tu = t5 - t0
+        tu = t7 - t0
         print('Total time used:', tu)
         
         
 
-        #getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
+        getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
         
-        wav_path = config['PATH']['audio']+showName+'.wav'
         
         t1=time.time()
         y, sr = librosa.load(wav_path,sr=None)
@@ -174,15 +191,23 @@ def runDiarization(showName, config):
         #print(config['PATH']['audio']+showName+'.wav')
         
         
-        speakerSlice = getSegResultForPlot(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
-        p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6))
-        p.draw()
-        p.plot.show()
-        
+        speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation))
+
         
     else:
         getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
+        speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1])
+     
     
+    p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6))
+    
+    wm = p.plot.get_current_fig_manager()
+    wm.window.state('zoomed')
+    
+    p.draw()
+    p.plot.show()
+        
+        
     if config.getint('OUTPUT','returnAllPartialSolutions'):
         if not os.path.isdir(config['PATH']['output']):
             os.mkdir(config['PATH']['output'])
@@ -223,8 +248,15 @@ if __name__ == "__main__":
         os.mkdir(config['PATH']['output'])
 
     # Files are diarized one by one
+    
+    #filename = '1.wav'
+    filename = '3057402.wav'
+    #filename = '3055877.wav'
+    #filename = 'chinese_same.wav'
+    
     for idx,showName in enumerate(showNameList):
-        if os.path.basename(showName) == '2.wav':
+        
+        if os.path.basename(showName) == filename:
         #if os.path.basename(showName) == 'chinese_same.wav':
             print('\nProcessing file',idx+1,'/',len(showNameList))
             runDiarization(os.path.splitext(os.path.basename(showName))[0], config)

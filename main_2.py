@@ -183,9 +183,9 @@ if __name__ == "__main__":
     
     
     filename = '1.wav'
-    #filename = '3055877.wav'
-    #filename = '3057402.wav'
+    filename = '3055877.wav'
+    filename = '3057402.wav'
     #filename = 'chinese_same.wav'
             
-    runDiarization(filename, config)
-    #plotRealtimeResult(filename)
+    #runDiarization(filename, config)
+    plotRealtimeResult(filename)

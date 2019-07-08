@@ -42,7 +42,7 @@ class ThreadingKBM(threading.Thread):
         while True:
             #print('Fail:this and last second: ',  self.this_second, self.last_second, ' data: ',len(self.data))
             
-            if self.this_second > self.last_second and self.this_second > 12:
+            if self.this_second > self.last_second and self.this_second > 11:
         
                 t0 = time.time()
                 
@@ -120,10 +120,17 @@ def main(filename, config):
     y = [] 
     
     
+    kbm = None
+    gmPool = None
+    Vg = None
+    kbm_version = 0
+    
     
     whole_process_start_time = time.time()
     
     while i < audio_duration:
+        
+        
         
         start_time = time.time()
         
@@ -162,10 +169,9 @@ def main(filename, config):
         kbm_t.data = data
         kbm_t.this_second = i
         
-        kbm = None
-        gmPool = None
-        Vg = None
-        kbm_version = 0
+        
+        
+        
         
         if kbm_t.Vg is not None:
             print('i: ', i, ' kbm second: ', kbm_t.last_second, ' kbm: ', kbm_t.kbmSize)
@@ -183,28 +189,40 @@ def main(filename, config):
             data_len = np.size(data, 0)
             if data_len > Vg_len:
                 # get Vg for new input data now
-                new_Vg = getVgMatrix(data[Vg_len:, :],gmPool,kbm,self.KBM_topG)
+                new_Vg = getVgMatrix(data[Vg_len:, :],gmPool,kbm, KBM_topG)
                 # combine new_Vg with Vg
                 
-                print('data:', data_len, 'new Vg:', new_Vg.shape, 'Vg:', Vg.shape)
+                prev_vg_shape = Vg.shape
                 
-                np.vstack(Vg, new_Vg)
-                print('Comine to Vg:', Vg.shape)
+                Vg = np.vstack((Vg, new_Vg))
 
-            
+                print('data:', data_len,  new_Vg.shape,  '+', prev_vg_shape ,'-->', Vg.shape, ' kbm version:', kbm_version)
+
             
             segmentBKTable, segmentCVTable = getSegmentBKs(segmentTable, kbmSize, Vg, bk_bits, speechMapping)    
             
             
-            '''
+            
             initialClustering = np.digitize(np.arange(numberOfSegments),np.arange(0,numberOfSegments,numberOfSegments/init_cluster))
             finalClusteringTable, k = performClustering(speechMapping, segmentTable, segmentBKTable, segmentCVTable, Vg, bk_bits, kbmSize, init_cluster, initialClustering, metric)        
             bestClusteringID = getBestClustering(metric, segmentBKTable, segmentCVTable, finalClusteringTable, k)
             
-           
-            finalClusteringTableResegmentation,finalSegmentTable = performResegmentation(data,speechMapping, mask,finalClusteringTable[:,bestClusteringID.astype(int)-1],segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
+            finalClustering = finalClusteringTable[:,bestClusteringID.astype(int)-1]
+            
+            if config.getint('RESEGMENTATION','resegmentation') and np.size(np.unique(finalClustering),0)>1:
 
-            '''
+            
+                finalClusteringTableResegmentation,finalSegment = performResegmentation(data,speechMapping, mask,finalClustering,segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
+                finalClustering = np.squeeze(finalClusteringTableResegmentation)
+            
+            else:
+                finalSegment = segmentTable
+            
+            #speakerSlice = getSegResultForPlot(frameshift,finalSegment, finalClustering)
+            
+            tu = time.time() - whole_process_start_time
+            getSegResultForPlotlater(frameshift,finalSegment, finalClustering, filename, i, tu)
+     
             
         used_time = time.time() - start_time
         #time.sleep(0.5)
@@ -230,5 +248,5 @@ if __name__ == "__main__":
     config.read(configFile)
     
     
-    filename = '1.wav'
+    filename = '3057402.wav'
     main(filename, config)
