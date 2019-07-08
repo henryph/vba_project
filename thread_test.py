@@ -36,12 +36,12 @@ class ThreadingKBM(threading.Thread):
         self.kbm = None
         self.gmPool = None
         self.Vg = None
-        
+        self.kbm_version = 0
         
     def run(self):
         while True:
             #print('Fail:this and last second: ',  self.this_second, self.last_second, ' data: ',len(self.data))
-        
+            
             if self.this_second > self.last_second and self.this_second > 12:
         
                 t0 = time.time()
@@ -56,11 +56,12 @@ class ThreadingKBM(threading.Thread):
                 self.kbmSize = 320
                 #self.kbmSize = int(np.floor(poolSize*self.KBM_rel_size))
                 self.kbm, self.gmPool = trainKBM(self.data,self.KBM_window_length, windowRate,self.kbmSize ) 
+ 
                 
-                #self.Vg = getVgMatrix(self.data,self.gmPool,self.kbm,self.KBM_topG)
+                self.Vg = getVgMatrix(self.data,self.gmPool,self.kbm,self.KBM_topG)
                 
-                #print('this & last second: ',  self.this_second, self.last_second, ' data: ',self.data.shape, ' KBM: ', self.kbmSize, ' time used: ', time.time()-t0)
-
+                # update the KBM version
+                self.kbm_version = self.this_second
                 self.last_second = self.this_second
             
             else:
@@ -98,7 +99,7 @@ def main(filename, config):
     seg_rate = config.getint('SEGMENT','rate')
     
 
-    
+    KBM_topG = config.getint('BINARY_KEY','topGaussiansPerFrame')
     bk_bits = config.getfloat('BINARY_KEY','bitsPerSegmentFactor')
     init_cluster = config.getint('CLUSTERING','N_init')
     metric = config['CLUSTERING']['metric']
@@ -161,18 +162,37 @@ def main(filename, config):
         kbm_t.data = data
         kbm_t.this_second = i
         
-        if kbm_t.kbm is not None:
+        kbm = None
+        gmPool = None
+        Vg = None
+        kbm_version = 0
+        
+        if kbm_t.Vg is not None:
             print('i: ', i, ' kbm second: ', kbm_t.last_second, ' kbm: ', kbm_t.kbmSize)
-            kbm = kbm_t.kbm
-            gmPool = kbm_t.gmPool
-            kbmSize = kbm_t.kbmSize
-            Vg = kbm_t.Vg
             
-            t0 = time.time()
-            Vg = getVgMatrix(data,gmPool,kbm,config.getint('BINARY_KEY','topGaussiansPerFrame')) 
-            t1 = time.time() 
+            if kbm_t.kbm_version > kbm_version:
+                print('update kbm now:', kbm_version,'-->',kbm_t.kbm_version)
+                # update kbm, gmPool and Vg
+                kbm = kbm_t.kbm
+                gmPool = kbm_t.gmPool
+                kbmSize = kbm_t.kbmSize
+                Vg = kbm_t.Vg
+                kbm_version = kbm_t.kbm_version
             
-            vg_t = t1 - t0            
+            Vg_len = np.size(Vg, 0)            
+            data_len = np.size(data, 0)
+            if data_len > Vg_len:
+                # get Vg for new input data now
+                new_Vg = getVgMatrix(data[Vg_len:, :],gmPool,kbm,self.KBM_topG)
+                # combine new_Vg with Vg
+                
+                print('data:', data_len, 'new Vg:', new_Vg.shape, 'Vg:', Vg.shape)
+                
+                np.vstack(Vg, new_Vg)
+                print('Comine to Vg:', Vg.shape)
+
+            
+            
             segmentBKTable, segmentCVTable = getSegmentBKs(segmentTable, kbmSize, Vg, bk_bits, speechMapping)    
             
             
