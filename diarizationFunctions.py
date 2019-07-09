@@ -657,7 +657,12 @@ def performResegmentation(data, speechMapping,mask,finalClusteringTable,segmentT
         gmm=mixture.GaussianMixture(n_components=msize,covariance_type='diag',weights_init=w_init,means_init=m_init,verbose=0)
         gmm.fit(data[spkIdxs,:])
         llkSpk = gmm.score_samples(data)
-        llkSpkSmoothed = np.zeros([1,numberOfSpeechFeatures])      
+        llkSpk
+        
+        
+        
+        
+        ed = np.zeros([1,numberOfSpeechFeatures])      
         for jx in np.arange(nSegs):
             sectionIdx = np.arange(speechMapping[segBeg[jx]]-1,speechMapping[segEnd[jx]]).astype(int)
             sectionWin = np.minimum(smoothWin,np.size(sectionIdx))
@@ -730,6 +735,16 @@ def getSegmentationFile(format, frameshift,finalSegmentTable, finalClusteringTab
     outf.writelines(solution)
     outf.write('\n')
     outf.close()
+
+    
+def rearrangeClusterID(Clustering):
+    finalClustering = []
+    speakerIDs = np.unique(finalClusteringTable)
+    print('speakerIDs:', speakerIDs)
+    for i in Clustering:
+        finalClustering.append(speakerIDS.index(i))
+    
+    return finalClustering
 
 def getSegResultForPlot(frameshift,finalSegmentTable, finalClusteringTable):
     
