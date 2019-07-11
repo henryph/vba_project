@@ -123,22 +123,31 @@ def runDiarization(showName, config):
         
         t4 = time.time()
         clustering_t = t4 - t3
+        
+        
+        finalClustering = finalClusteringTable[:,bestClusteringID.astype(int)-1]
+        
+        if config.getint('RESEGMENTATION','resegmentation') and np.size(np.unique(finalClustering),0)>1:
+            
+            finalClusteringTableResegmentation,finalSegment = performResegmentation(data,speechMapping, mask,finalClusteringTable[:,bestClusteringID.astype(int)-1],segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
+            t5 = time.time()
+            reseg_t = t5 - t4
+            
+            print('time:', i , 'data:', data.shape,'Vg:', Vg.shape, 'segT:', segmentTable.shape, 
+                  'CVT:', segmentCVTable.shape, 'kbm:', kbmSize, 'C:',finalClusteringTable[:,bestClusteringID.astype(int)-1].shape,'finalC:',finalClusteringTableResegmentation.shape,'finalSeg:',finalSegmentTable.shape)    
 
+            
+            finalClustering = np.squeeze(finalClusteringTableResegmentation)
+            speakerSlice = getSegResultForPlot(frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation))
+        else:
+
+            
+            finalClustering = rearrangeClusterID(finalClustering)
+            finalSegment = segmentTable
+            
+        tu = time.time() - t0
         
-        finalClusteringTableResegmentation,finalSegmentTable = performResegmentation(data,speechMapping, mask,finalClusteringTable[:,bestClusteringID.astype(int)-1],segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
-        t5 = time.time()
-        reseg_t = t5 - t4
-        tu = t5 - t0
-        #getSegmentationFile(config['OUTPUT']['format'],frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
-        #print(feature_t, SAD_t, KBM_t, clustering_t, reseg_t, tu)
-        #wav_path = './audio_test/2.wav'
-        #print(config['PATH']['audio']+showName+'.wav')
-        
-        print('time:', i , 'data:', data.shape,'Vg:', Vg.shape, 'segT:', segmentTable.shape, 
-              'CVT:', segmentCVTable.shape, 'kbm:', kbmSize, 'C:',finalClusteringTable[:,bestClusteringID.astype(int)-1].shape,'finalC:',finalClusteringTableResegmentation.shape,'finalSeg:',finalSegmentTable.shape)    
-        
-        
-        speakerSlice = getSegResultForPlot(frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation))
+        speakerSlice = getSegResultForPlot(frameshift,finalSegment, finalClustering)
         
         #getSegResultForPlotlater(frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, i, tu)
         #print('time: ', i, 'used:', tu)
