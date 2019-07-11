@@ -67,13 +67,7 @@ class ThreadingKBM(threading.Thread):
             else:
                 time.sleep(0.5)
 
-
-
-def update_kbm(input_data):
-    
-    pass
-
-def main(filename, config):
+def main(filename, config, Plot_and_play = False):
     
 
     
@@ -104,17 +98,7 @@ def main(filename, config):
     init_cluster = config.getint('CLUSTERING','N_init')
     metric = config['CLUSTERING']['metric']
     
-
-    
-    
-    
-    # init the threading
-    
-    kbm_t = ThreadingKBM(config)
-    kbm_t.start()
-    
-    
-    
+   
     step = 1
     i = step
     y = [] 
@@ -124,7 +108,21 @@ def main(filename, config):
     gmPool = None
     Vg = None
     kbm_version = 0
+
+    # init the threading
     
+    kbm_t = ThreadingKBM(config)
+    kbm_t.start()
+    
+ 
+    
+    # init the viewer and player
+    if Plot_and_play:
+        p = PlotDiar(map={}, wav=wav_path, duration = audio_duration+5, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ', gui=True)
+        wm = p.plot.get_current_fig_manager()
+        wm.window.state('zoomed')
+        p.plot.show()
+        p.audio.play()
     
     whole_process_start_time = time.time()
     
@@ -216,12 +214,17 @@ def main(filename, config):
                 finalClustering = np.squeeze(finalClusteringTableResegmentation)
             
             else:
+                finalClustering = rearrangeClusterID(finalClustering)
                 finalSegment = segmentTable
             
-            #speakerSlice = getSegResultForPlot(frameshift,finalSegment, finalClustering)
             
-            tu = time.time() - whole_process_start_time
-            getSegResultForPlotlater(frameshift,finalSegment, finalClustering, filename, i, tu)
+            if Plot_and_play:
+                speakerSlice = getSegResultForPlot(frameshift,finalSegment, finalClustering)
+                p.allmap[i] = speakerSlice
+            
+            else:
+                tu = time.time() - start_time
+                getSegResultForPlotlater(frameshift,finalSegment, finalClustering, filename, i, tu)
      
             
         used_time = time.time() - start_time
@@ -249,4 +252,4 @@ if __name__ == "__main__":
     
     
     filename = '3057402.wav'
-    main(filename, config)
+    main(filename, config, Plot_and_play = False)
