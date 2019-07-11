@@ -8,7 +8,7 @@ class PlotDiar:
     """
     A viewer of segmentation
     """
-    def __init__(self, map=None, wav=None, duration=120, title='', gui=False, vgrid=False, size=(18, 9)):
+    def __init__(self, map=None, wav=None, duration=120, gui=False, vgrid=False, size=(18, 9)):
         self.rect_picked = None
         self.rect_color = (0.0, 0.6, 1.0, 1.0)  # '#0099FF'
         self.rect_selected_color = (0.75, 0.75, 0, 1.0)  # 'y'
@@ -30,12 +30,12 @@ class PlotDiar:
         plot.rcParams['keymap.save'] = 'ctrl+s'
         # plot.rcParams.update({'font.family': 'courrier'})
 
-
+    
         self.gui = gui
         self.vgrid = vgrid
         self.fig = plot.figure(figsize=size, facecolor='white', tight_layout=True)
         self.plot = plot
-        self.title = title
+        self.title = 'Binary key diarization: ' +wav_path   +', number of speakers: '
 
         self.ax = self.fig.add_subplot(1, 1, 1)
         cids = list()
@@ -56,25 +56,31 @@ class PlotDiar:
         self.audio = None
         if self.wav is not None and self.gui:
             self.audio = AudioPlayer(wav)
-            self.timer = self.fig.canvas.new_timer(interval=500)
+            self.timer = self.fig.canvas.new_timer(interval=100)
             self.timer.add_callback(self._update_result)
             self.timer.start()
 
         #self.timeline = self.ax.plot([0, 0], [0, 0], color='r')[-1]
         
         self.allmap = map
-        self.map = map
+        self.map = {}
+        
+        self.last_second = 0
+        
         self.time_stamp = list()
         self.time_stamp_idx = 0
     
     def _update_result(self):
         t = self.audio.time()
         int_t = int(t)
-        if int_t in self.allmap.keys():
+        if int_t > self.last_second and int_t in self.allmap.keys():
             print('drawing: ', int_t)
             self.map = self.allmap[int_t]
             self.draw()
             self.fig.canvas.draw()
+            self.last_second = int_t
+        elif int_t <= self.last_second:
+            print('already plot for:', int_t)
         else:
             print('No data to draw for:', int_t)
             
@@ -150,15 +156,19 @@ class PlotDiar:
         plot.yticks(labels_pos, labels)
         self.maxy = y
         self.end_play = self.maxx
+        
         for cluster in self.map:
             self.ax.plot([0, self.maxx], [y, y], linestyle=':',
                          color='#AAAAAA')
             y -= self.height
 
-        plot.title(self.title + ' (last frame: ' + str(self.maxx) + ')')
-        if self.gui:
-            self._draw_info(0)
+        plot.title(self.title +  str(i+1))
+        
+        #if self.gui:
+        #    self._draw_info(0)
+        
         plot.tight_layout()
+        
         #self.time_stamp = list(set(self.time_stamp))
         #self.time_stamp.sort()
         
