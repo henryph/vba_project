@@ -144,11 +144,26 @@ def runDiarization(showName, config):
     print("Time used for best clustering: ",best_clustering_t)
     
     
-    
+    final_clustering = finalClusteringTable[:,bestClusteringID.astype(int)-1]
+
     
     if config.getint('RESEGMENTATION','resegmentation') and np.size(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]),0)>1:
+        
+        
+        print(final_clustering.shape)
+        print(final_clustering)
+        
+        print(segmentTable.shape)
+        
         print('Performing GMM-ML resegmentation...')
         finalClusteringTableResegmentation,finalSegmentTable = performResegmentation(data,speechMapping, mask,finalClusteringTable[:,bestClusteringID.astype(int)-1],segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
+        
+        
+        print(finalClusteringTableResegmentation.shape)
+        print(finalClusteringTableResegmentation)
+        print(finalSegmentTable.shape)
+        
+        
         print('done')
         
         
@@ -195,8 +210,9 @@ def runDiarization(showName, config):
 
         
     else:
-        getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
-        speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1])
+        clustering = rearrangeClusterID(final_clustering)
+        #getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
+        speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),segmentTable, clustering)
      
     
     p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6))
@@ -250,8 +266,8 @@ if __name__ == "__main__":
     # Files are diarized one by one
     
     #filename = '1.wav'
-    filename = '3057402.wav'
-    #filename = '3055877.wav'
+    #filename = '3057402.wav'
+    filename = '3055877.wav'
     #filename = 'chinese_same.wav'
     
     for idx,showName in enumerate(showNameList):

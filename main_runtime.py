@@ -66,6 +66,9 @@ def runDiarization(showName,config):
     print('Number of speech features\t',nSpeechFeatures)
     print('Number of segements \t', numberOfSegments)
     
+    t3 = time.time()
+    seg_t = t3 - t2
+    
     #create the KBM
     print('Training the KBM... ')
     #set the window rate in order to obtain "minimumNumberOfInitialGaussians" gaussians
@@ -79,18 +82,25 @@ def runDiarization(showName,config):
     else:
         kbmSize = int(config.getint('KBM','kbmSize'))        
     print('Training pool of',int(poolSize),'gaussians with a rate of',int(windowRate),'frames')    
-    kbm, gmPool = trainKBM(data,config.getint('KBM','windowLength'),windowRate,kbmSize )    
+    kbm, gmPool = trainKBM(data,config.getint('KBM','windowLength'),windowRate,kbmSize )  
+    
+    t4 = time.time()
+    KBM_t = t4 - t3
+    print("Time used for traing KBM and cal BK, CV: ", KBM_t)
+  
+    
     print('Selected',kbmSize,'gaussians from the pool')    
     Vg = getVgMatrix(data,gmPool,kbm,config.getint('BINARY_KEY','topGaussiansPerFrame'))    
     
 
+
     print('Computing binary keys for all segments... ')
     segmentBKTable, segmentCVTable = getSegmentBKs(segmentTable, kbmSize, Vg, config.getfloat('BINARY_KEY','bitsPerSegmentFactor'), speechMapping)    
     
-    
-    t3 = time.time()
-    KBM_t = t3 - t2
-    print("Time used for traing KBM and cal BK, CV: ", KBM_t)
+
+    t5 = time.time()
+    BKCV_t = t5 - t4
+    print("Time used to cal BK, CV: ", BKCV_t)
     
     print('Performing initial clustering... ')
     initialClustering = np.digitize(np.arange(numberOfSegments),np.arange(0,numberOfSegments,numberOfSegments/config.getint('CLUSTERING','N_init')))
@@ -108,8 +118,8 @@ def runDiarization(showName,config):
     print('Best clustering:\t',bestClusteringID.astype(int))
     print('Number of clusters:\t',np.size(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]),0))    
     
-    t4 = time.time()
-    clustering_t = t4 - t3
+    t6 = time.time()
+    clustering_t = t6 - t5
     print("Time used for clustering: ",clustering_t)
     
     if config.getint('RESEGMENTATION','resegmentation') and np.size(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]),0)>1:
@@ -118,11 +128,11 @@ def runDiarization(showName,config):
         print('done')
         
         
-        t5 = time.time()
-        reseg_t = t5 - t4
+        t7 = time.time()
+        reseg_t = t7 - t6
         print("Time used for resegmentation: ",  reseg_t)
         
-        tu = t5 - t0
+        tu = t6 - t0
         print('Total time used:', tu)
         
         
@@ -134,15 +144,17 @@ def runDiarization(showName,config):
         t1=time.time()
         y, sr = librosa.load(wav_path,sr=None)
         audio_duration = librosa.get_duration(y, sr=sr)
-        print('load data: ', time.time()- t1)
+        tload = time.time() - t1
+        #print('load data: ', time.time()- t1)
         
         
         print('audio duration: ', audio_duration)
         print('real-time factor: ', tu / audio_duration)
         
         #print(feature_t, SAD_t, KBM_t, clustering_t, reseg_t, tu)
+
         
-        time_list = ['%.5f' % t for t in [feature_t, SAD_t, KBM_t, clustering_t, reseg_t, tu, audio_duration, tu/audio_duration]]
+        time_list = ['%.5f' % t for t in [feature_t - tload, SAD_t- tload, seg_t, KBM_t, BKCV_t, clustering_t, reseg_t, tu, audio_duration, tu/audio_duration]]
         return time_list
         
         #wav_path = './audio_test/2.wav'
@@ -158,18 +170,7 @@ def runDiarization(showName,config):
     else:
         getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
     
-    if config.getint('OUTPUT','returnAllPartialSolutions'):
-        if not os.path.isdir(config['PATH']['output']):
-            os.mkdir(config['PATH']['output'])
-        outputPathInd = config['PATH']['output']+ config['EXPERIMENT']['name'] + '/' + showName + '/'
-        if not os.path.isdir(config['PATH']['output'] + config['EXPERIMENT']['name']):
-            os.mkdir(config['PATH']['output'] + config['EXPERIMENT']['name'])
-        if not os.path.isdir(outputPathInd):            
-            os.mkdir(outputPathInd)
-        for i in np.arange(k):
-            getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'), segmentTable, finalClusteringTable[:,i], showName, showName+'_'+str(np.size(np.unique(finalClusteringTable[:,i]),0))+'_spk', outputPathInd, config['EXTENSION']['output'])        
-    
-        
+
     print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
     
 if __name__ == "__main__":     
@@ -212,14 +213,14 @@ if __name__ == "__main__":
       
   
     
-    with open('time_2_test.csv', 'w', newline='') as csvfile:
+    with open('time_5min_test4.csv', 'w', newline='') as csvfile:
         twriter = csv.writer(csvfile, delimiter=',')
-        twriter.writerow(['filename', 'feature_t', 'SAD_t', 'KBM_t', 'clustering_t', 'reseg_t', 
+        twriter.writerow(['filename', 'load_data_t','feature_t', 'SAD_t', 'KBM_t','BKCV_t', 'clustering_t', 'reseg_t', 
                           'total', 'duration', 'RF'])
     
         # Files are diarized one by one
         for idx,showName in enumerate(showNameList):
-            for i in range(0, 10):
+            for i in range(0, 5):
                 #if os.path.basename(showName) == '2.wav':
 
                     print('\nProcessing file',idx+1,'/',len(showNameList))

@@ -657,12 +657,7 @@ def performResegmentation(data, speechMapping,mask,finalClusteringTable,segmentT
         gmm=mixture.GaussianMixture(n_components=msize,covariance_type='diag',weights_init=w_init,means_init=m_init,verbose=0)
         gmm.fit(data[spkIdxs,:])
         llkSpk = gmm.score_samples(data)
-        llkSpk
-        
-        
-        
-        
-        ed = np.zeros([1,numberOfSpeechFeatures])      
+        llkSpkSmoothed = np.zeros([1,numberOfSpeechFeatures])      
         for jx in np.arange(nSegs):
             sectionIdx = np.arange(speechMapping[segBeg[jx]]-1,speechMapping[segEnd[jx]]).astype(int)
             sectionWin = np.minimum(smoothWin,np.size(sectionIdx))
@@ -697,6 +692,26 @@ def performResegmentation(data, speechMapping,mask,finalClusteringTable,segmentT
     except:
         finalClusteringTableResegmentation = np.vstack((finalClusteringTableResegmentation,segOut[(changes[i]).astype(int)]))    
     return finalClusteringTableResegmentation,finalSegmentTable  
+
+
+def rearrangeClusterID(Clustering):
+    Clustering = list(Clustering)
+    def findfirstpos(x):
+        return Clustering.index(x)
+    
+    finalClustering = []
+    speakerIDs = list(np.unique(Clustering))
+    speakerIDs.sort(key=findfirstpos)
+    
+    idmap = {}
+    for i, v in enumerate(speakerIDs):
+        idmap[v] = i + 1
+    
+    for v in Clustering:
+        finalClustering.append(idmap[v])
+    
+    return finalClustering
+
 
 def getSegmentationFile(format, frameshift,finalSegmentTable, finalClusteringTable, showName, filename, outputPath, outputExt):
     numberOfSpeechFeatures = finalSegmentTable[-1,2].astype(int)+1
@@ -735,16 +750,6 @@ def getSegmentationFile(format, frameshift,finalSegmentTable, finalClusteringTab
     outf.writelines(solution)
     outf.write('\n')
     outf.close()
-
-    
-def rearrangeClusterID(Clustering):
-    finalClustering = []
-    speakerIDs = np.unique(finalClusteringTable)
-    print('speakerIDs:', speakerIDs)
-    for i in Clustering:
-        finalClustering.append(speakerIDS.index(i))
-    
-    return finalClustering
 
 def getSegResultForPlot(frameshift,finalSegmentTable, finalClusteringTable):
     
