@@ -620,6 +620,50 @@ def getSpectralClustering(bestClusteringMetric,clusteringTable,N_init, bkT, cvT,
     bestClusteringID = minidx  
     return bestClusteringID
 
+def reselectBestClustering(ClusteringTable, bestClusteringID, prevC, n, cvT, mode = 1):
+    from scipy.spatial.distance import cdist  
+    
+    numberOfC = np.sizes(ClusteringTable, axis = 2)
+    BC = finalClusteringTable[:,bestClusteringID.astype(int)-1]
+    
+    print(finalClusteringTable[:,numberOfC-1])
+    if mode == 1:
+        if bestClusteringID > 1 and bestClusteringID < numberOfC:
+            C1 = ClusteringTable[:,bestClusteringID.astype(int)-2]
+            C2 = ClusteringTable[:,bestClusteringID.astype(int)]
+            print(np.unique(C1), np.unique(BC), np.unique(C2))
+            print(C1.shape, BC.shape, C2.shape, prevC.shape)
+            C1 = C1[:-2]
+            C2 = C2[:-2]
+            BC = BC[:-2]
+            print(C1.shape, BC.shape, C2.shape, prevC.shape)
+
+            d1 = cdist(C1,prevC,metric='cosine')
+            db = cdist(BC,prevC,metric='cosine')
+            d2 = cdist(C2,prevC,metric='cosine')
+
+            l = [C1, BC, C2]
+
+            minidx = np.argmin([d1, db, d2])
+            print([d1, db, d2], minidx, np.unique(l[minidx])
+
+            return l[minidx]
+
+        else:
+            return BC
+    else:
+        for i in [bestClusteringID - 1, bestClusteringID, bestClusteringID + 1]:
+            T = clusteringTable[:,i]
+            clusterIDs = np.unique(T)
+            for j in np.arange(np.size(clusterIDs,0)):
+                clusterIDsIndex = np.where(T==clusterIDs[j])
+                meanVector = np.mean(cvT[clusterIDsIndex,:],axis=1)
+                
+                distances = cdist(meanVector,cvT[clusterIDsIndex,:][0],bestClusteringMetric)
+
+
+
+
 def smooth(a,WSZ):
     # a: NumPy 1-D array containing the data to be smoothed
     # WSZ: smoothing window size needs, which must be odd number,
