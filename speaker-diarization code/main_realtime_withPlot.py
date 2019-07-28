@@ -6,7 +6,7 @@ import librosa
 import numpy as np
 from diarizationFunctions import *
 sys.path.append('visualization')
-from viewer3 import PlotDiar
+from viewer4 import PlotDiar
 
 class ThreadingPlot(threading.Thread):
     '''
@@ -186,6 +186,7 @@ class mainThread(threading.Thread):
         self.y_total, self.sr = librosa.load(wav_path,sr=None)
         self.audio_duration = librosa.get_duration(self.y_total, sr=self.sr)
         
+        self.y = None
         
         
         
@@ -244,14 +245,15 @@ class mainThread(threading.Thread):
                 
                 
                 if self.i + self.step >= self.audio_duration:
-                    #y = self.y_total
+                    y = self.y_total
                     new_y = self.y_total[(self.i-self.step) * self.sr:]
 
                 else:
-                    #y = self.y_total[0 : self.i * self.sr - 1]
+                    y = self.y_total[0 : self.i * self.sr - 1]
                     new_y = self.y_total[(self.i-self.step) * self.sr : self.i*self.sr - 1]
                 
-                #print(self.i, len(y)/self.sr, len(new_y), len(y), len(self.y_total))
+                self.y = y
+                
                 self.i = self.i + self.step
                 
                 f = extractFeaturesFromSignal(new_y, self.sr, self.nfilters,self.ncoeff, self.NFFT, self.hop)
@@ -417,7 +419,7 @@ class mainThread(threading.Thread):
                     print('second: ', self.i, ' used time:', used_time, '-' * 20)
                     time.sleep(max(0.98 - used_time, 0))
             
-def main(filename, config, Use_clustering_thread, Text_output):
+def main(filename, config, Use_clustering_thread = True, Text_output = False):
     
     t = mainThread(filename, config, Use_clustering_thread, Text_output)
     t.start()
@@ -437,6 +439,22 @@ def main(filename, config, Use_clustering_thread, Text_output):
     
     #time.sleep(180)
 
+
+def main2(showName, config):
+    from viewer2 import PlotDiar as PlotDiar2
+    wav_path = config['PATH']['audio']+showName
+    result_path = './out/' + showName.replace('.wav', '') + '.rttm'
+    speakerSlice = readSegResultforPlot(result_path)
+    
+    y, sr = librosa.load(wav_path,sr=None)
+    duration = librosa.get_duration(y, sr=sr)
+    
+    p = PlotDiar2(map=speakerSlice, wav=wav_path, duration = duration+5, title = 'Binary key diarization: ' +wav_path, gui=True)
+    wm = p.plot.get_current_fig_manager()
+    wm.window.state('zoomed')
+    p.audio.play()
+    p.plot.show()
+
 if __name__ == "__main__":     
     # If a config file in INI format is passed by argument line then it's used. 
     # For INI config formatting please refer to https://docs.python.org/3/library/configparser.html
@@ -448,8 +466,10 @@ if __name__ == "__main__":
     config.read(configFile)
     
     
+     
+    filename = '3066806.wav' # p later
     filename = '3065554.wav'
-    filename = '3066806.wav' # poor later
+
+    main(filename, config)
     
-    main(filename, config, Use_clustering_thread = True, Text_output = False)
-    
+    #main2('3057402.wav', config)

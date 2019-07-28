@@ -13,7 +13,7 @@ from viewer import PlotDiar
 import time
 import librosa
 
-def runDiarization(showName, config):   
+def runDiarization(showName, config, plot = False):   
     
     wav_path = config['PATH']['audio']+showName+'.wav'
     
@@ -26,7 +26,6 @@ def runDiarization(showName, config):
     else:
         allData=getFeatures(config['PATH']['features']+showName+config['EXTENSION']['features'])
     nFeatures = allData.shape[0]    
-    print('shape of features:', allData.shape)
     print('Initial number of features\t',nFeatures) 
     
     
@@ -50,7 +49,6 @@ def runDiarization(showName, config):
     SAD_t = t2 - t1
     print("Time used for SAD: ", SAD_t)
     
-    print('shape of SAD mask', maskSAD.shape)
     
     mask = np.logical_and(maskUEM,maskSAD)    
     mask = mask[0][0:nFeatures]
@@ -69,7 +67,6 @@ def runDiarization(showName, config):
     print('Number of speech features\t',nSpeechFeatures)
     print('Number of segements \t', numberOfSegments)
     
-    print(segmentTable[0])
     #create the KBM
     print('Training the KBM... ')
     
@@ -81,7 +78,6 @@ def runDiarization(showName, config):
         windowRate = int(np.floor((np.size(data,0)-config.getint('KBM','windowLength'))/config.getint('KBM','minimumNumberOfInitialGaussians')))
     else:
         windowRate = int(config.getint('KBM','maximumKBMWindowRate'))      
-    print('KBM window rate:', windowRate)
       
     poolSize = np.floor((nSpeechFeatures-config.getint('KBM','windowLength'))/windowRate)
     if  config.getint('KBM','useRelativeKBMsize'):
@@ -93,8 +89,6 @@ def runDiarization(showName, config):
     print('Selected',kbmSize,'gaussians from the pool')    
     
     Vg = getVgMatrix(data,gmPool,kbm,config.getint('BINARY_KEY','topGaussiansPerFrame'))    
-    print(Vg[0])
-    print('Vg shape:', Vg.shape)
     
     t3 = time.time()
     KBM_t = t3 - t2
@@ -103,8 +97,6 @@ def runDiarization(showName, config):
     print('Computing binary keys for all segments... ')
     segmentBKTable, segmentCVTable = getSegmentBKs(segmentTable, kbmSize, Vg, config.getfloat('BINARY_KEY','bitsPerSegmentFactor'), speechMapping)    
 
-    print(segmentBKTable.shape)
-    print(segmentCVTable.shape)
     
     t4 = time.time()
     BKCV_t = t4 - t3
@@ -135,11 +127,7 @@ def runDiarization(showName, config):
     print('Best clustering:\t',bestClusteringID.astype(int))
     print('Number of clusters:\t',np.size(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]),0))    
     
-    print(np.unique(finalClusteringTable))
-    print(finalClusteringTable.shape)
-    print(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]))
-    #print('best clustering results:')
-    #print(finalClusteringTable[:,bestClusteringID.astype(int)-1])
+
     
     t6 = time.time()
     best_clustering_t = t6 - t5
@@ -152,31 +140,11 @@ def runDiarization(showName, config):
     if config.getint('RESEGMENTATION','resegmentation') and np.size(np.unique(finalClusteringTable[:,bestClusteringID.astype(int)-1]),0)>1:
         
         
-        print(final_clustering.shape)
-        print(final_clustering)
-        
-        print(segmentTable.shape)
-        
         print('Performing GMM-ML resegmentation...')
         finalClusteringTableResegmentation,finalSegmentTable = performResegmentation(data,speechMapping, mask,finalClusteringTable[:,bestClusteringID.astype(int)-1],segmentTable,config.getint('RESEGMENTATION','modelSize'),config.getint('RESEGMENTATION','nbIter'),config.getint('RESEGMENTATION','smoothWin'),nSpeechFeatures)
-        
-        
-        print(finalClusteringTableResegmentation.shape)
-        print(finalClusteringTableResegmentation)
-        print(finalSegmentTable.shape)
-        
-        
+             
         print('done')
         
-        
-        print(finalClusteringTableResegmentation.shape)
-        print(finalSegmentTable.shape)
-        print(segmentTable.shape)
-        '''
-        for i in range(0, 19):
-            print(finalClusteringTableResegmentation[i],finalSegmentTable[i],finalSegmentTable[i][0]-finalSegmentTable[i][2])
-        
-        '''
         
         
         t7 = time.time()
@@ -188,43 +156,43 @@ def runDiarization(showName, config):
         
         
 
-        getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])
+        getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),
+                            finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), 
+                            showName, showName, config['PATH']['output'], config['EXTENSION']['output'])
         
-        
+
+        '''
         t1=time.time()
         y, sr = librosa.load(wav_path,sr=None)
         audio_duration = librosa.get_duration(y, sr=sr)
         print('load data: ', time.time()- t1)
-        
-        
         print('audio duration: ', audio_duration)
         print('real-time factor: ', tu / audio_duration)
+        '''
         
-        print(wav_path)
+        #print(feature_t, SAD_t, KBM_t, clustering_t, reseg_t, tu)
         
-        print(feature_t, SAD_t, KBM_t, clustering_t, reseg_t, tu)
+
         
-        #wav_path = './audio_test/2.wav'
-        #print(config['PATH']['audio']+showName+'.wav')
-        
-        
-        speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation))
+        if plot:
+            speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),finalSegmentTable, np.squeeze(finalClusteringTableResegmentation))
 
         
     else:
         clustering = rearrangeClusterID(final_clustering)
-        #getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
-        speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),segmentTable, clustering)
+        getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, clustering, showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
+        if plot:
+            speakerSlice = getSegResultForPlot(config.getfloat('FEATURES','frameshift'),segmentTable, clustering)
      
-    
-    p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6))
-    
-    wm = p.plot.get_current_fig_manager()
-    wm.window.state('zoomed')
-    
-    p.draw()
-    p.plot.show()
+    if plot:
+        p = PlotDiar(map=speakerSlice, wav=wav_path, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ' + str(len(speakerSlice)), gui=True, pick=True, size=(25, 6), plot_specgram=False)
         
+        wm = p.plot.get_current_fig_manager()
+        wm.window.state('zoomed')
+        
+        p.draw()
+        p.plot.show()
+            
         
     if config.getint('OUTPUT','returnAllPartialSolutions'):
         if not os.path.isdir(config['PATH']['output']):
@@ -246,7 +214,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         configFile = sys.argv[1]
     else:
-        configFile = 'config-test.ini'    
+        configFile = 'config-offline.ini'    
     config = configparser.ConfigParser()
     config.read(configFile)
     
@@ -267,13 +235,13 @@ if __name__ == "__main__":
 
     # Files are diarized one by one
     
-    #filename = '1.wav'
-    filename = '3057402.wav'
-    #filename = 'chinese_same.wav'
+    #filename = '3054300.wav'
+    #filename = '3057402.wav'
     
     for idx,showName in enumerate(showNameList):
         
-        if os.path.basename(showName) == filename:
+        if os.path.basename(showName) == '3054300.wav':
         #if os.path.basename(showName) == 'chinese_same.wav':
             print('\nProcessing file',idx+1,'/',len(showNameList))
-            runDiarization(os.path.splitext(os.path.basename(showName))[0], config)
+            runDiarization(os.path.splitext(os.path.basename(showName))[0], config, plot = True)
+    

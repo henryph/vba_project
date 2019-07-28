@@ -45,13 +45,22 @@ def runDiarization(showName, config):
     y = [] 
     
     while i < audio_duration:
+        
+        
+        
         if i + step >= audio_duration:
             y = y_total
         else:
             y = y_total[0 : i * sr]
             
-
+            if i% 30 != 0:
+                i = i + step
+                continue
+            
         i = i + step
+        
+
+        
     
         
     
@@ -97,7 +106,7 @@ def runDiarization(showName, config):
             kbm, gmPool = trainKBM(data,KBM_window_length,windowRate,kbmSize )      
             Vg = getVgMatrix(data,gmPool,kbm,config.getint('BINARY_KEY','topGaussiansPerFrame')) 
         except: 
-            print('time: ', i, ' Failed: windowRate: ', windowRate, ' poolSize: ', poolSize, ' kbm size: ', kbmSize)
+            #print('time: ', i, ' Failed: windowRate: ', windowRate, ' poolSize: ', poolSize, ' kbm size: ', kbmSize)
             continue
         
         
@@ -138,7 +147,7 @@ def runDiarization(showName, config):
 
             
             finalClustering = np.squeeze(finalClusteringTableResegmentation)
-            speakerSlice = getSegResultForPlot(frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation))
+            #speakerSlice = getSegResultForPlot(frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation))
         else:
 
             
@@ -147,10 +156,18 @@ def runDiarization(showName, config):
             
         tu = time.time() - t0
         
-        speakerSlice = getSegResultForPlot(frameshift,finalSegment, finalClustering)
+        #speakerSlice = getSegResultForPlot(frameshift,finalSegment, finalClustering)
         
-        #getSegResultForPlotlater(frameshift,finalSegmentTable, np.squeeze(finalClusteringTableResegmentation), showName, i, tu)
+        #getSegResultForPlotlater(frameshift,finalSegment, finalClustering, showName, i, tu)
         #print('time: ', i, 'used:', tu)
+
+        j=i-1
+        if j%30 == 0:
+            print(j)
+            showName = filename.replace('.wav','')
+            getSegmentationFile('RTTM', frameshift,finalSegment, finalClustering, showName, 
+                                        'BetterResult_'+str(j), './out/', '.rttm')
+
        
         '''
         if i % 10 == 0:
@@ -163,6 +180,9 @@ def runDiarization(showName, config):
     
     #getSegmentationFile(config['OUTPUT']['format'],config.getfloat('FEATURES','frameshift'),segmentTable, finalClusteringTable[:,bestClusteringID.astype(int)-1], showName, config['EXPERIMENT']['name'], config['PATH']['output'], config['EXTENSION']['output'])      
     
+    showName = filename.replace('.wav','')
+    getSegmentationFile('RTTM', frameshift,finalSegment, finalClustering, showName, 
+                                'BetterResult_final', './out/', '.rttm')
 
         
     print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
@@ -178,6 +198,7 @@ def plotRealtimeResult(showName):
     p = PlotDiar(map=speakerSlice, wav=wav_path, duration = duration+5, title = 'Binary key diarization: ' +wav_path   +', number of speakers: ', gui=True)
     wm = p.plot.get_current_fig_manager()
     wm.window.state('zoomed')
+    p.audio.play()
     p.plot.show()
 
 if __name__ == "__main__":     
@@ -191,11 +212,15 @@ if __name__ == "__main__":
     config.read(configFile)
     
     
-    filename = '1.wav'
-    filename = '3055877.wav'
-    filename = '3057402.wav'
-    filename = '3065154.wav'
-    #filename = 'chinese_same.wav'
+
             
-    #runDiarization(filename, config)
-    plotRealtimeResult(filename)
+    
+    #plotRealtimeResult(filename)
+    
+    folder = config['PATH']['audio']
+    folder = './audio/all/'
+    
+    for filename in os.listdir(folder):
+        print(filename)
+
+        runDiarization(filename, config)

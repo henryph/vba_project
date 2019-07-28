@@ -821,7 +821,7 @@ def getSegmentationFile(format, frameshift,finalSegmentTable, finalClusteringTab
         print('Output file format must be MDTM or RTTM.')
     solution[-1]=solution[-1][0:-1]        
         
-    outf = open(outputPath+filename+outputExt,"a")    
+    outf = open(outputPath+filename+outputExt,"a+")    
     outf.writelines(solution)
     outf.write('\n')
     outf.close()
@@ -922,6 +922,47 @@ def getSegResultForPlotlater(frameshift,finalSegmentTable, finalClusteringTable,
     outf.writelines(solution)
     outf.write('\n')
     outf.close()
+
+
+def getSegResultForAccuracy(frameshift,finalSegmentTable, finalClusteringTable, showName, end_time, running_time):
+    numberOfSpeechFeatures = finalSegmentTable[-1,2].astype(int)+1
+    solutionVector = np.zeros([1,numberOfSpeechFeatures])
+    for i in np.arange(np.size(finalSegmentTable,0)):
+        solutionVector[0,np.arange(finalSegmentTable[i,1],finalSegmentTable[i,2]+1).astype(int)]=finalClusteringTable[i]
+    seg = np.empty([0,3]) 
+    solutionDiff = np.diff(solutionVector)[0]
+    first = 0
+    for i in np.arange(0,np.size(solutionDiff,0)):
+        if solutionDiff[i]:
+            last = i+1
+            seg1 = (first)*frameshift
+            seg2 = (last-first)*frameshift
+            seg3 = solutionVector[0,last-1]
+            if seg3:
+                seg = np.vstack((seg,[seg1,seg2,seg3]))
+            first = i+1
+    last = np.size(solutionVector,1)
+    seg1 = (first-1)*frameshift
+    seg2 = (last-first+1)*frameshift
+    seg3 = solutionVector[0,last-1]
+    seg = np.vstack((seg,[seg1,seg2,seg3])) 
+    
+    solution = []
+
+    for i in np.arange(np.size(seg,0)):
+        #s = [showName, str(end_time), str(np.around(running_time,decimals=4)), str(np.around(seg[i,0],decimals=4)), str(np.around(seg[i,1],decimals=4)), ' speaker' + str(seg[i,2].astype(int))]
+        solution.append(showName+' '+str(end_time)+' '+str(np.around(running_time,decimals=4))+' '+str(np.around(seg[i,0],decimals=4))+' '+str(np.around(seg[i,1],decimals=4))+' speaker'+str(seg[i,2].astype(int))+' <NA>\n')
+
+    solution[-1]=solution[-1][0:-1]     
+    
+    
+    outf = open('./out/'+showName.replace('.wav', '')+'.rttm',"a")    
+    outf.writelines(solution)
+    outf.write('\n')
+    outf.close()
+
+
+
 
 
 def readSegResultforPlot(filename):

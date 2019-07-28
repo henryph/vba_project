@@ -9,7 +9,7 @@ class PlotDiar:
     """
     A viewer of segmentation
     """
-    def __init__(self, map=None, wav=None, title='', gui=False, pick=False, vgrid=False, size=(18, 9)):
+    def __init__(self, map=None, wav=None, title='', gui=False, pick=False, vgrid=False, size=(18, 9), plot_specgram = False):
         self.rect_picked = None
         self.rect_color = (0.0, 0.6, 1.0, 1.0)  # '#0099FF'
         self.rect_selected_color = (0.75, 0.75, 0, 1.0)  # 'y'
@@ -19,7 +19,7 @@ class PlotDiar:
         
         self.cluster_colors = [(0.0, 0.5, 1.0, 1.0), (0.0, 1.0, 0.5, 1.0), (0.5, 0.0, 1.0, 1.0), 
                                (0.5, 1.0, 0.0, 1.0), (1.0, 0.0, 0.5, 1.0), (1.0, 0.5, 0.0, 1.0)]
-        
+        '''
         plot.rcParams['keymap.fullscreen'] = 'ctrl+f'
         plot.rcParams['keymap.home'] = ''
         plot.rcParams['keymap.back'] = ''
@@ -33,6 +33,7 @@ class PlotDiar:
         plot.rcParams['keymap.all_axes'] = ''
         plot.rcParams['toolbar'] = 'None'
         plot.rcParams['keymap.save'] = 'ctrl+s'
+        '''
         # plot.rcParams.update({'font.family': 'courrier'})
 
         self.pick = pick
@@ -41,8 +42,16 @@ class PlotDiar:
         self.fig = plot.figure(figsize=size, facecolor='white', tight_layout=True)
         self.plot = plot
         self.title = title
+        
+        self.wav = wav
 
-        self.ax = self.fig.add_subplot(1, 1, 1)
+        
+        if not plot_specgram:
+            self.ax = self.fig.add_subplot(1, 1, 1)
+        else:
+            self.ax = self.fig.add_subplot(2, 1, 1)
+            
+
         cids = list()
         if self.gui:
             cids.append(
@@ -55,7 +64,6 @@ class PlotDiar:
         self.maxx = 0
         self.maxy = 0
         self.end_play = 0
-        self.wav = wav
         self.audio = None
         if self.wav is not None and self.gui:
             self.audio = AudioPlayer(wav)
@@ -67,7 +75,30 @@ class PlotDiar:
         self.map = map
         self.time_stamp = list()
         self.time_stamp_idx = 0
+        
+        
+        if plot_specgram:
 
+            self.ax2 = self.fig.add_subplot(2, 1, 2)
+            self.draw_spectrogram()
+    
+    
+    def draw_spectrogram(self):
+        import librosa
+        signalData, sr = librosa.load(self.wav,sr=None)
+        #spec = plot.specgram(signalData,Fs=sr)
+        plot.sca(self.ax2)
+        plot.ylabel("frequency (hz)")
+        plot.xlabel("seconds")
+
+        plot.specgram(signalData,Fs=sr)
+        plot.title('Spectrogram')
+
+
+        #plot.colorbar(None,use_gridspec=True)
+
+
+    
     def _draw_timeline(self, t):
         """
         Draw the timeline a position t
@@ -117,8 +148,9 @@ class PlotDiar:
                 self._hms(w), w, int(w * 100))
 
         plot.xlabel(ch + '\n' + ch2)
-
+        
     def draw(self):
+        plot.sca(self.ax)
         """
         Draw the segmentation
 
@@ -142,6 +174,7 @@ class PlotDiar:
                 self.ax.add_patch(rect)
             y += self.height
         if self.gui:
+            #self.ax.xlim([0, min(600, self.maxx)])
             plot.xlim([0, min(600, self.maxx)])
         else:
             plot.xlim([0, self.maxx])
@@ -159,9 +192,14 @@ class PlotDiar:
         
         y+=2 * self.height
         '''
-            
+        
+        
+        #self.ax.set_ylim([0,y])
+        #self.ax.set_yticks(labels_pos, labels)
+
         plot.ylim([0, y])
         plot.yticks(labels_pos, labels)
+        
         self.maxy = y
         self.end_play = self.maxx
         
@@ -187,7 +225,8 @@ class PlotDiar:
 
         
 
-        
+        plot.ylabel("speakers")
+
         
     def _dec_right(self, min, max):
         """
